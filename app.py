@@ -6,7 +6,7 @@ import pandas as pd
 # LOAD MODEL
 # =========================
 model = joblib.load("student_model.pkl")
-columns = joblib.load("model_columns.pkl")
+columns = joblib.load("model_columns.pkl") 
 
 # =========================
 # TITLE
