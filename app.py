@@ -4,507 +4,398 @@ import pandas as pd
 import json
 import os
 import hashlib
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import date
+from datetime import date, datetime
 
-# -------------------------------------------------------
-# PAGE SETUP
-# -------------------------------------------------------
+# ══════════════════════════════════════════════════════════
+# PAGE CONFIG
+# ══════════════════════════════════════════════════════════
 st.set_page_config(page_title="ScoreIQ", page_icon="🎓", layout="centered")
 
-# -------------------------------------------------------
-# THEME DEFINITIONS
-# -------------------------------------------------------
-DARK = {
-    "bg":        "#0d1117",
-    "bg2":       "#161b22",
-    "bg3":       "#1c2333",
-    "border":    "#30363d",
-    "border2":   "#21262d",
-    "text":      "#e6edf3",
-    "text2":     "#c9d1d9",
-    "muted":     "#8b949e",
-    "faint":     "#6e7681",
-    "accent":    "#a78bfa",
-    "accent2":   "#60a5fa",
-    "green":     "#34d399",
-    "yellow":    "#fbbf24",
-    "red":       "#f87171",
-    "grad_bg":   "radial-gradient(ellipse at 20% 0%, #1a1f35 0%, #0d1117 60%)",
-    "card_bg":   "linear-gradient(145deg, #161b22, #1c2333)",
-    "btn_bg":    "linear-gradient(135deg, #7c3aed, #4f46e5)",
-    "btn_hover": "linear-gradient(135deg, #8b5cf6, #6366f1)",
-    "input_bg":  "#0d1117",
-    "sidebar_bg":"#161b22",
-    "plot_bg":   "#161b22",
-    "plot_paper":"#161b22",
-    "plot_font": "#c9d1d9",
-    "plot_grid": "#21262d",
-}
-LIGHT = {
-    "bg":        "#f8f9fc",
-    "bg2":       "#ffffff",
-    "bg3":       "#f1f3f9",
-    "border":    "#d1d9e0",
-    "border2":   "#e2e8f0",
-    "text":      "#1a202c",
-    "text2":     "#2d3748",
-    "muted":     "#718096",
-    "faint":     "#a0aec0",
-    "accent":    "#7c3aed",
-    "accent2":   "#3b82f6",
-    "green":     "#059669",
-    "yellow":    "#d97706",
-    "red":       "#dc2626",
-    "grad_bg":   "radial-gradient(ellipse at 20% 0%, #ede9fe 0%, #f8f9fc 60%)",
-    "card_bg":   "linear-gradient(145deg, #ffffff, #f7f8fc)",
-    "btn_bg":    "linear-gradient(135deg, #7c3aed, #4f46e5)",
-    "btn_hover": "linear-gradient(135deg, #8b5cf6, #6366f1)",
-    "input_bg":  "#ffffff",
-    "sidebar_bg":"#ffffff",
-    "plot_bg":   "#ffffff",
-    "plot_paper":"#ffffff",
-    "plot_font": "#2d3748",
-    "plot_grid": "#e2e8f0",
-}
+# ══════════════════════════════════════════════════════════
+# THEME COLORS
+# ══════════════════════════════════════════════════════════
+DARK = dict(
+    bg="#0d1117", bg2="#161b22", bg3="#1c2333",
+    border="#30363d", border2="#21262d",
+    text="#e6edf3", text2="#c9d1d9", muted="#8b949e", faint="#6e7681",
+    accent="#a78bfa", accent2="#60a5fa",
+    green="#34d399", yellow="#fbbf24", red="#f87171",
+    grad="radial-gradient(ellipse at 15% 0%, #1e1535 0%, #0d1117 65%)",
+    card="linear-gradient(145deg,#161b22,#1c2333)",
+    shadow="rgba(0,0,0,0.45)",
+    inp="#0d1117",
+)
+LIGHT = dict(
+    bg="#f5f6fa", bg2="#ffffff", bg3="#eef0f7",
+    border="#dde1ea", border2="#e8eaf0",
+    text="#1a1d2e", text2="#3a3f5c", muted="#6b7280", faint="#9ca3af",
+    accent="#6d28d9", accent2="#2563eb",
+    green="#059669", yellow="#d97706", red="#dc2626",
+    grad="radial-gradient(ellipse at 15% 0%, #ede9fe 0%, #f5f6fa 65%)",
+    card="linear-gradient(145deg,#ffffff,#f7f8fd)",
+    shadow="rgba(99,102,241,0.07)",
+    inp="#ffffff",
+)
 
-# -------------------------------------------------------
+# ══════════════════════════════════════════════════════════
 # SESSION STATE
-# -------------------------------------------------------
-defaults = {
-    "logged_in": False,
-    "username": "",
-    "role": "",
-    "page": "login",
-    "dark_mode": True,
-}
-for k, v in defaults.items():
+# ══════════════════════════════════════════════════════════
+for k, v in dict(logged_in=False, username="", role="", page="login", dark=True).items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-T = DARK if st.session_state.dark_mode else LIGHT
+T = DARK if st.session_state.dark else LIGHT
 
-# -------------------------------------------------------
-# INJECT CSS (theme-aware)
-# -------------------------------------------------------
-def inject_css(T):
-    st.markdown(f"""
+# ══════════════════════════════════════════════════════════
+# INJECT CSS
+# ══════════════════════════════════════════════════════════
+dm = st.session_state.dark
+st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=Lora:ital,wght@0,600;1,400&display=swap');
 
-html, body, [class*="css"] {{
-    font-family: 'DM Sans', sans-serif;
-    background-color: {T['bg']};
-    color: {T['text']};
-}}
-#MainMenu, footer, header {{ visibility: hidden; }}
-.block-container {{ padding-top: 2rem; padding-bottom: 3rem; max-width: 740px; }}
+*, *::before, *::after {{ box-sizing: border-box; }}
+html, body, [class*="css"] {{ font-family:'Sora',sans-serif; background:{T['bg']}; color:{T['text']}; }}
+#MainMenu,footer,header {{ visibility:hidden; }}
+.block-container {{ padding-top:1.8rem; padding-bottom:3rem; max-width:760px; }}
+.stApp {{ background:{T['grad']}; min-height:100vh; }}
 
-.stApp {{
-    background: {T['grad_bg']};
-    min-height: 100vh;
+/* ─── App title ─── */
+.app-logo {{
+  font-family:'Lora',serif; font-size:2.9rem; font-weight:600; text-align:center;
+  background:linear-gradient(130deg,{T['accent']},{T['accent2']},{T['green']});
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  letter-spacing:-0.5px; margin:0;
 }}
-
-/* ── Logo ── */
-.logo-title {{
-    font-family: 'Playfair Display', serif;
-    font-size: 2.8rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, {T['accent']}, {T['accent2']}, {T['green']});
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-align: center;
-    letter-spacing: -1px;
-    margin-bottom: 0;
-}}
-.logo-sub {{
-    text-align: center;
-    color: {T['faint']};
-    font-size: 0.95rem;
-    font-weight: 300;
-    letter-spacing: 0.05em;
-    margin-top: 4px;
-    margin-bottom: 2rem;
+.app-tagline {{
+  text-align:center; color:{T['faint']}; font-size:0.9rem; font-weight:300;
+  letter-spacing:0.06em; margin:4px 0 2rem;
 }}
 
-/* ── Cards ── */
+/* ─── Cards ─── */
 .card {{
-    background: {T['card_bg']};
-    border: 1px solid {T['border']};
-    border-radius: 16px;
-    padding: 2rem 2.2rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,{0.35 if st.session_state.dark_mode else 0.08});
+  background:{T['card']}; border:1px solid {T['border']};
+  border-radius:18px; padding:1.8rem 2rem; margin-bottom:1.4rem;
+  box-shadow:0 6px 30px {T['shadow']};
 }}
 
-/* ── Section labels ── */
-.section-label {{
-    font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: {T['accent']};
-    margin-bottom: 0.8rem;
+/* ─── Section label ─── */
+.sec {{
+  font-size:0.68rem; font-weight:600; letter-spacing:0.18em;
+  text-transform:uppercase; color:{T['accent']}; margin-bottom:0.8rem;
 }}
 
-/* ── Labels ── */
+/* ─── Divider ─── */
+.div {{
+  border:none; height:1px; margin:1.3rem 0;
+  background:linear-gradient(to right,transparent,{T['border']},transparent);
+}}
+
+/* ─── Streamlit widget labels ─── */
 label, .stSelectbox label, .stNumberInput label,
 .stTextInput label, .stRadio label, .stDateInput label {{
-    color: {T['muted']} !important;
-    font-size: 0.82rem !important;
-    font-weight: 400 !important;
-    letter-spacing: 0.03em !important;
+  color:{T['muted']} !important; font-size:0.8rem !important;
+  font-weight:400 !important; letter-spacing:0.03em !important;
 }}
 
-/* ── Inputs ── */
+/* ─── Inputs ─── */
 input, .stTextInput input, .stNumberInput input {{
-    background-color: {T['input_bg']} !important;
-    border: 1px solid {T['border']} !important;
-    border-radius: 8px !important;
-    color: {T['text']} !important;
-    font-family: 'DM Sans', sans-serif !important;
+  background:{T['inp']} !important; border:1px solid {T['border']} !important;
+  border-radius:9px !important; color:{T['text']} !important;
+  font-family:'Sora',sans-serif !important; font-size:0.88rem !important;
 }}
 input:focus {{
-    border-color: {T['accent']} !important;
-    box-shadow: 0 0 0 3px rgba(124,58,237,0.15) !important;
+  border-color:{T['accent']} !important;
+  box-shadow:0 0 0 3px rgba(109,40,217,0.12) !important;
 }}
 
-/* ── Selectbox ── */
-.stSelectbox > div > div {{
-    background-color: {T['input_bg']} !important;
-    border: 1px solid {T['border']} !important;
-    border-radius: 8px !important;
-    color: {T['text']} !important;
+/* ─── Selectbox ─── */
+.stSelectbox>div>div {{
+  background:{T['inp']} !important; border:1px solid {T['border']} !important;
+  border-radius:9px !important; color:{T['text']} !important;
 }}
 
-/* ── Date input ── */
-.stDateInput > div > div {{
-    background-color: {T['input_bg']} !important;
-    border: 1px solid {T['border']} !important;
-    border-radius: 8px !important;
-    color: {T['text']} !important;
+/* ─── Date input ─── */
+.stDateInput>div>div {{
+  background:{T['inp']} !important; border:1px solid {T['border']} !important;
+  border-radius:9px !important; color:{T['text']} !important;
 }}
 
-/* ── Radio ── */
-.stRadio > div {{ flex-direction: row; gap: 0.8rem; flex-wrap: wrap; }}
-.stRadio > div > label {{
-    background: {T['bg2']};
-    border: 1px solid {T['border']};
-    border-radius: 8px;
-    padding: 0.45rem 1.1rem !important;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: {T['muted']} !important;
-    font-size: 0.85rem !important;
+/* ─── Radio ─── */
+.stRadio>div {{ flex-direction:row; gap:0.7rem; flex-wrap:wrap; }}
+.stRadio>div>label {{
+  background:{T['bg2']}; border:1px solid {T['border']};
+  border-radius:9px; padding:0.45rem 1.1rem !important;
+  cursor:pointer; transition:all .2s;
+  color:{T['muted']} !important; font-size:0.83rem !important;
 }}
-.stRadio > div > label:has(input:checked) {{
-    border-color: {T['accent']} !important;
-    background: {'rgba(167,139,250,0.1)' if st.session_state.dark_mode else 'rgba(124,58,237,0.08)'} !important;
-    color: {T['accent']} !important;
+.stRadio>div>label:has(input:checked) {{
+  border-color:{T['accent']} !important;
+  background:{'rgba(167,139,250,0.1)' if dm else 'rgba(109,40,217,0.07)'} !important;
+  color:{T['accent']} !important;
 }}
 
-/* ── Primary Button ── */
-.stButton > button {{
-    width: 100%;
-    background: {T['btn_bg']};
-    color: white !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 0.72rem 1.5rem !important;
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.95rem !important;
-    font-weight: 500 !important;
-    letter-spacing: 0.03em !important;
-    cursor: pointer;
-    transition: all 0.25s ease !important;
-    box-shadow: 0 4px 15px rgba(124,58,237,0.3) !important;
+/* ─── Primary button ─── */
+.stButton>button {{
+  width:100%; background:linear-gradient(135deg,#7c3aed,#4f46e5);
+  color:#fff !important; border:none !important; border-radius:11px !important;
+  padding:0.72rem 1.5rem !important; font-family:'Sora',sans-serif !important;
+  font-size:0.92rem !important; font-weight:600 !important;
+  letter-spacing:0.02em !important; cursor:pointer;
+  transition:all .25s ease !important;
+  box-shadow:0 4px 16px rgba(124,58,237,0.32) !important;
 }}
-.stButton > button:hover {{
-    background: {T['btn_hover']} !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 20px rgba(124,58,237,0.4) !important;
+.stButton>button:hover {{
+  background:linear-gradient(135deg,#8b5cf6,#6366f1) !important;
+  transform:translateY(-2px) !important;
+  box-shadow:0 7px 22px rgba(124,58,237,0.42) !important;
 }}
-.stButton > button:active {{ transform: translateY(0) !important; }}
+.stButton>button:active {{ transform:translateY(0) !important; }}
 
-/* ── Secondary Button ── */
-.secondary-btn > button {{
-    background: transparent !important;
-    border: 1px solid {T['border']} !important;
-    color: {T['muted']} !important;
-    box-shadow: none !important;
+/* ─── Ghost button ─── */
+.ghost>button {{
+  background:transparent !important;
+  border:1px solid {T['border']} !important;
+  color:{T['muted']} !important; box-shadow:none !important;
 }}
-.secondary-btn > button:hover {{
-    border-color: {T['muted']} !important;
-    color: {T['text']} !important;
-    transform: none !important;
-    box-shadow: none !important;
-    background: {'rgba(255,255,255,0.04)' if st.session_state.dark_mode else 'rgba(0,0,0,0.03)'} !important;
+.ghost>button:hover {{
+  border-color:{T['muted']} !important; color:{T['text']} !important;
+  background:{'rgba(255,255,255,0.04)' if dm else 'rgba(0,0,0,0.03)'} !important;
+  transform:none !important; box-shadow:none !important;
 }}
 
-/* ── Alerts ── */
-.stAlert {{ border-radius: 10px !important; border-left-width: 4px !important; }}
+/* ─── Alerts ─── */
+.stAlert {{ border-radius:11px !important; border-left-width:4px !important; }}
 
-/* ── Score card ── */
-.score-card {{
-    border-radius: 16px;
-    padding: 2rem;
-    text-align: center;
-    margin: 1.5rem 0;
-    animation: fadeUp 0.5s ease;
+/* ─── Score card ─── */
+.score-hero {{
+  border-radius:18px; padding:2rem 1.5rem;
+  text-align:center; margin:1.4rem 0; animation:fadeUp .5s ease;
 }}
-.score-card.excellent {{
-    background: linear-gradient(135deg, rgba(52,211,153,0.12), rgba(16,185,129,0.05));
-    border: 1px solid rgba(52,211,153,0.3);
-}}
-.score-card.good {{
-    background: linear-gradient(135deg, rgba(251,191,36,0.12), rgba(245,158,11,0.05));
-    border: 1px solid rgba(251,191,36,0.3);
-}}
-.score-card.low {{
-    background: linear-gradient(135deg, rgba(248,113,113,0.12), rgba(239,68,68,0.05));
-    border: 1px solid rgba(248,113,113,0.3);
-}}
-.score-number {{
-    font-family: 'Playfair Display', serif;
-    font-size: 4rem;
-    font-weight: 700;
-    line-height: 1;
-}}
-.score-number.excellent {{ color: {T['green']}; }}
-.score-number.good      {{ color: {T['yellow']}; }}
-.score-number.low       {{ color: {T['red']}; }}
-.score-label  {{ font-size: 0.82rem; color: {T['faint']}; margin-top: 0.4rem; letter-spacing: 0.08em; text-transform: uppercase; }}
-.score-remark {{ font-size: 1rem; margin-top: 0.6rem; color: {T['text2']}; }}
-.score-bar-wrap {{
-    background: {T['border2']};
-    border-radius: 99px;
-    height: 8px;
-    margin: 1rem auto;
-    max-width: 320px;
-    overflow: hidden;
-}}
-.score-bar-fill {{ height: 100%; border-radius: 99px; }}
+.score-hero.ok  {{ background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(16,185,129,.04)); border:1px solid rgba(52,211,153,.35); }}
+.score-hero.mid {{ background:linear-gradient(135deg,rgba(251,191,36,.12),rgba(245,158,11,.04)); border:1px solid rgba(251,191,36,.35); }}
+.score-hero.low {{ background:linear-gradient(135deg,rgba(248,113,113,.12),rgba(239,68,68,.04));  border:1px solid rgba(248,113,113,.35); }}
+.score-big {{ font-family:'Lora',serif; font-size:4.5rem; font-weight:600; line-height:1; }}
+.score-big.ok  {{ color:{T['green']}; }}
+.score-big.mid {{ color:{T['yellow']}; }}
+.score-big.low {{ color:{T['red']}; }}
+.score-tag {{ font-size:.78rem; color:{T['faint']}; letter-spacing:.1em; text-transform:uppercase; margin-top:.35rem; }}
+.score-note{{ font-size:.97rem; color:{T['text2']}; margin-top:.55rem; }}
 
-/* ── Suggestion items ── */
-.suggestion-item {{
-    display: flex;
-    align-items: flex-start;
-    gap: 0.8rem;
-    background: {T['bg2']};
-    border: 1px solid {T['border2']};
-    border-radius: 10px;
-    padding: 0.9rem 1.1rem;
-    margin-bottom: 0.6rem;
-    animation: fadeUp 0.4s ease;
-}}
-.suggestion-icon  {{ font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }}
-.suggestion-text  {{ font-size: 0.88rem; color: {T['text2']}; line-height: 1.5; }}
-.suggestion-title {{ font-weight: 500; color: {T['text']}; margin-bottom: 2px; }}
+/* ─── Progress bar ─── */
+.bar-wrap {{ background:{T['border2']}; border-radius:99px; height:9px; max-width:300px; margin:.9rem auto; overflow:hidden; }}
+.bar-fill  {{ height:100%; border-radius:99px; }}
 
-/* ── Divider ── */
-.styled-divider {{
-    border: none;
-    height: 1px;
-    background: linear-gradient(to right, transparent, {T['border']}, transparent);
-    margin: 1.4rem 0;
+/* ─── Report card ─── */
+.report-wrap {{
+  background:{T['bg2']}; border:1px solid {T['border']};
+  border-radius:16px; padding:1.8rem 2rem; margin-top:1rem;
 }}
+.report-title {{
+  font-family:'Lora',serif; font-size:1.3rem; font-weight:600;
+  color:{T['text']}; margin-bottom:0.2rem;
+}}
+.report-sub {{ font-size:0.78rem; color:{T['faint']}; margin-bottom:1.2rem; }}
+.report-row {{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:.55rem 0; border-bottom:1px solid {T['border2']};
+  font-size:.86rem;
+}}
+.report-row:last-child {{ border-bottom:none; }}
+.report-key {{ color:{T['muted']}; }}
+.report-val {{ font-weight:600; color:{T['text']}; }}
+.badge {{
+  display:inline-block; border-radius:20px; padding:.18rem .75rem;
+  font-size:.72rem; font-weight:600; letter-spacing:.05em;
+}}
+.badge-ok  {{ background:rgba(52,211,153,.15);  color:{T['green']};  border:1px solid rgba(52,211,153,.3); }}
+.badge-mid {{ background:rgba(251,191,36,.15);  color:{T['yellow']}; border:1px solid rgba(251,191,36,.3); }}
+.badge-low {{ background:rgba(248,113,113,.15); color:{T['red']};    border:1px solid rgba(248,113,113,.3); }}
 
-/* ── Sidebar ── */
+/* ─── Suggestion items ─── */
+.sug {{
+  display:flex; align-items:flex-start; gap:.75rem;
+  background:{T['bg3']}; border:1px solid {T['border2']};
+  border-radius:11px; padding:.85rem 1rem; margin-bottom:.55rem;
+}}
+.sug-icon {{ font-size:1.25rem; flex-shrink:0; margin-top:1px; }}
+.sug-body {{ font-size:.84rem; color:{T['text2']}; line-height:1.55; }}
+.sug-title{{ font-weight:600; color:{T['text']}; margin-bottom:2px; }}
+
+/* ─── Sidebar ─── */
 section[data-testid="stSidebar"] {{
-    background: {T['sidebar_bg']} !important;
-    border-right: 1px solid {T['border']} !important;
+  background:{T['bg2']} !important; border-right:1px solid {T['border']} !important;
 }}
-.sidebar-user {{
-    background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(59,130,246,0.05));
-    border: 1px solid rgba(124,58,237,0.2);
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    margin-bottom: 1rem;
+.sb-card {{
+  background:linear-gradient(135deg,{'rgba(167,139,250,0.1)' if dm else 'rgba(109,40,217,0.06)'},transparent);
+  border:1px solid {'rgba(167,139,250,0.22)' if dm else 'rgba(109,40,217,0.14)'};
+  border-radius:13px; padding:.95rem 1.1rem; margin-bottom:1rem;
 }}
-.sidebar-name {{ font-family: 'Playfair Display', serif; font-size: 1.05rem; color: {T['text']}; }}
-.sidebar-role {{ font-size: 0.75rem; color: {T['accent']}; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 2px; }}
-.sidebar-meta {{ font-size: 0.78rem; color: {T['muted']}; margin-top: 4px; }}
+.sb-name {{ font-family:'Lora',serif; font-size:1.05rem; color:{T['text']}; }}
+.sb-role {{ font-size:.72rem; color:{T['accent']}; letter-spacing:.07em; text-transform:uppercase; margin-top:3px; }}
+.sb-info {{ font-size:.76rem; color:{T['muted']}; margin-top:5px; line-height:1.5; }}
 
-/* ── Theme toggle ── */
-.theme-toggle {{
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 0.5rem;
+/* ─── Metric tweaks ─── */
+[data-testid="stMetric"] {{
+  background:{T['bg3']}; border:1px solid {T['border2']};
+  border-radius:12px; padding:.7rem 1rem;
 }}
+[data-testid="stMetricValue"] {{ color:{T['accent']} !important; font-size:1.4rem !important; }}
 
-/* ── Animations ── */
+/* ─── Animation ─── */
 @keyframes fadeUp {{
-    from {{ opacity: 0; transform: translateY(12px); }}
-    to   {{ opacity: 1; transform: translateY(0); }}
+  from {{ opacity:0; transform:translateY(14px); }}
+  to   {{ opacity:1; transform:translateY(0); }}
 }}
-.fade-in {{ animation: fadeUp 0.5s ease; }}
-
-/* ── Info chips ── */
-.info-chip {{
-    display: inline-block;
-    background: {'rgba(167,139,250,0.12)' if st.session_state.dark_mode else 'rgba(124,58,237,0.08)'};
-    border: 1px solid rgba(124,58,237,0.25);
-    color: {T['accent']};
-    border-radius: 20px;
-    padding: 0.25rem 0.85rem;
-    font-size: 0.78rem;
-    font-weight: 500;
-    margin-right: 0.4rem;
-    margin-bottom: 0.4rem;
-}}
+.fade {{ animation:fadeUp .45s ease; }}
 </style>
 """, unsafe_allow_html=True)
 
-inject_css(T)
-
-# -------------------------------------------------------
+# ══════════════════════════════════════════════════════════
 # HELPERS
-# -------------------------------------------------------
-def hash_password(p):
+# ══════════════════════════════════════════════════════════
+def hp(p):
     return hashlib.sha256(p.encode()).hexdigest()
 
 def load_users():
     if not os.path.exists("users.json"):
-        demo = {
-            "student": {"password": hash_password("student123"), "role": "Student"},
-            "parent":  {"password": hash_password("parent123"),  "role": "Parent",
-                        "child_name": "Demo Child", "child_dob": "2010-05-15", "child_class": "8"},
+        d = {
+            "student1": dict(password=hp("student123"), role="Student",
+                             name="Demo Student", dob="2008-06-15", cls="10"),
+            "parent1":  dict(password=hp("parent123"),  role="Parent",
+                             name="Demo Parent",  dob="1980-03-20", cls="",
+                             child_name="Demo Child", child_dob="2010-01-10", child_cls="7"),
         }
-        save_users(demo)
-        return demo
-    with open("users.json") as f:
-        return json.load(f)
+        save_users(d); return d
+    with open("users.json") as f: return json.load(f)
 
 def save_users(u):
-    with open("users.json", "w") as f:
-        json.dump(u, f, indent=4)
+    with open("users.json","w") as f: json.dump(u, f, indent=4)
 
-def divider():
-    st.markdown('<hr class="styled-divider">', unsafe_allow_html=True)
-
-def section(label):
-    st.markdown(f'<p class="section-label">{label}</p>', unsafe_allow_html=True)
-
-def theme_toggle():
-    col_space, col_btn = st.columns([5, 1])
-    with col_btn:
-        icon = "☀️" if st.session_state.dark_mode else "🌙"
-        if st.button(icon, key="theme_btn"):
-            st.session_state.dark_mode = not st.session_state.dark_mode
-            st.rerun()
+def calc_age(dob_str):
+    try:
+        dob = datetime.strptime(dob_str, "%Y-%m-%d").date()
+        td  = date.today()
+        return td.year - dob.year - ((td.month, td.day) < (dob.month, dob.day))
+    except: return "—"
 
 @st.cache_resource
 def load_model():
     return joblib.load("student_model.pkl"), joblib.load("model_columns.pkl")
 
-def plot_cfg(T):
-    """Shared plotly layout config for consistent theming."""
-    return dict(
-        paper_bgcolor=T["plot_paper"],
-        plot_bgcolor=T["plot_bg"],
-        font=dict(family="DM Sans", color=T["plot_font"], size=12),
-        margin=dict(l=20, r=20, t=40, b=20),
-    )
+def sec(label):
+    st.markdown(f'<p class="sec">{label}</p>', unsafe_allow_html=True)
 
-# ================================================================
-# PAGE 1 — LOGIN
-# ================================================================
-def login_page():
-    theme_toggle()
-    st.markdown('<h1 class="logo-title">ScoreIQ</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="logo-sub">AI-powered exam score predictor for students & parents</p>', unsafe_allow_html=True)
+def div():
+    st.markdown('<hr class="div">', unsafe_allow_html=True)
 
-    st.markdown(f'<div class="card fade-in">', unsafe_allow_html=True)
-
-    section("Choose your role")
-    role = st.radio("role", ["🎒 Student", "👨‍👩‍👧 Parent"], horizontal=True, label_visibility="collapsed")
-    role_clean = "Student" if "Student" in role else "Parent"
-
-    divider()
-    section("Sign in to your account")
-    username = st.text_input("Username", placeholder="your username")
-    password = st.text_input("Password", type="password", placeholder="••••••••")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("Sign In →"):
-        users = load_users()
-        uname = username.strip().lower()
-        if not uname or not password:
-            st.error("Please fill in all fields.")
-        elif uname not in users:
-            st.error("Username not found. Please sign up first.")
-        elif users[uname]["password"] != hash_password(password):
-            st.error("Wrong password. Please try again.")
-        elif users[uname]["role"] != role_clean:
-            st.error(f"This account is registered as **{users[uname]['role']}**, not {role_clean}.")
-        else:
-            st.session_state.logged_in = True
-            st.session_state.username  = uname
-            st.session_state.role      = role_clean
+def theme_btn(key="tb"):
+    cols = st.columns([6,1])
+    with cols[1]:
+        if st.button("☀️" if dm else "🌙", key=key):
+            st.session_state.dark = not st.session_state.dark
             st.rerun()
 
+# ══════════════════════════════════════════════════════════
+# PAGE 1 — LOGIN
+# ══════════════════════════════════════════════════════════
+def login_page():
+    theme_btn("tb_login")
+    st.markdown('<h1 class="app-logo">ScoreIQ</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="app-tagline">AI-powered exam score predictor</p>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card fade">', unsafe_allow_html=True)
+    sec("Login as")
+    role = st.radio("r", ["🎒 Student", "👨‍👩‍👧 Parent"], horizontal=True, label_visibility="collapsed")
+    role_clean = "Student" if "Student" in role else "Parent"
+    div()
+    sec("Your credentials")
+    uname = st.text_input("Username", placeholder="enter your username")
+    pwd   = st.text_input("Password", type="password", placeholder="••••••••")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if st.button("Sign In →", key="login_btn"):
+        users = load_users()
+        u = uname.strip().lower()
+        if not u or not pwd:
+            st.error("Please fill in all fields.")
+        elif u not in users:
+            st.error("Username not found. Please sign up.")
+        elif users[u]["password"] != hp(pwd):
+            st.error("Incorrect password.")
+        elif users[u]["role"] != role_clean:
+            st.error(f"This account is registered as {users[u]['role']}, not {role_clean}.")
+        else:
+            st.session_state.logged_in = True
+            st.session_state.username  = u
+            st.session_state.role      = role_clean
+            st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:0.88rem;margin:0.5rem 0;">New here?</p>', unsafe_allow_html=True)
-    st.markdown('<div class="secondary-btn">', unsafe_allow_html=True)
-    if st.button("Create an account"):
-        st.session_state.page = "signup"
-        st.rerun()
+    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:.86rem;margin:.4rem 0">New here?</p>', unsafe_allow_html=True)
+    st.markdown('<div class="ghost">', unsafe_allow_html=True)
+    if st.button("Create an account", key="go_signup"):
+        st.session_state.page = "signup"; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:.72rem;margin-top:1.2rem">Demo → student1 / student123 &nbsp;·&nbsp; parent1 / parent123</p>', unsafe_allow_html=True)
 
-    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:0.75rem;margin-top:1.5rem;">Demo → student / student123 · parent / parent123</p>', unsafe_allow_html=True)
 
-
-# ================================================================
-# PAGE 2 — SIGN UP (with child details for parents)
-# ================================================================
+# ══════════════════════════════════════════════════════════
+# PAGE 2 — SIGN UP
+# ══════════════════════════════════════════════════════════
 def signup_page():
-    theme_toggle()
-    st.markdown('<h1 class="logo-title">ScoreIQ</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="logo-sub">Create your account — it takes less than a minute</p>', unsafe_allow_html=True)
+    theme_btn("tb_signup")
+    st.markdown('<h1 class="app-logo">ScoreIQ</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="app-tagline">Create your account</p>', unsafe_allow_html=True)
 
-    st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-
-    section("I am a...")
-    role = st.radio("role_signup", ["🎒 Student", "👨‍👩‍👧 Parent"], horizontal=True, label_visibility="collapsed")
+    st.markdown('<div class="card fade">', unsafe_allow_html=True)
+    sec("I am a...")
+    role = st.radio("rs", ["🎒 Student", "👨‍👩‍👧 Parent"], horizontal=True, label_visibility="collapsed")
     role_clean = "Student" if "Student" in role else "Parent"
 
-    divider()
-    section("Account credentials")
-    username = st.text_input("Username", placeholder="min 3 characters")
-    password = st.text_input("Password", type="password", placeholder="min 6 characters")
-    confirm  = st.text_input("Confirm Password", type="password", placeholder="re-enter your password")
+    div()
+    sec("Personal details")
+    col1, col2 = st.columns(2)
+    with col1:
+        full_name = st.text_input("Full Name", placeholder="e.g. Priya Sharma")
+        dob       = st.date_input("Date of Birth", value=date(2008,1,1),
+                                  min_value=date(1950,1,1), max_value=date(2020,12,31))
+    with col2:
+        cls_opts  = ["1","2","3","4","5","6","7","8","9","10","11","12","College","Other"]
+        student_cls = st.selectbox("Class / Grade", cls_opts, index=9)
 
-    # ── Extra fields for Parent ──
-    child_name  = ""
-    child_dob   = None
-    child_class = ""
+    # ── Extra: parent's child details ──
+    child_name = child_dob_val = child_cls = ""
     if role_clean == "Parent":
-        divider()
-        section("Your child's details")
-        child_name  = st.text_input("Child's Full Name", placeholder="e.g. Rahul Sharma")
-        child_dob   = st.date_input(
-            "Child's Date of Birth",
-            value=date(2010, 1, 1),
-            min_value=date(1995, 1, 1),
-            max_value=date(2020, 12, 31)
-        )
-        child_class = st.selectbox(
-            "Child's Current Class / Grade",
-            ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "College"]
-        )
+        div()
+        sec("Your child's details")
+        col3, col4 = st.columns(2)
+        with col3:
+            child_name    = st.text_input("Child's Full Name", placeholder="e.g. Rahul Sharma")
+            child_dob_val = st.date_input("Child's Date of Birth", value=date(2010,1,1),
+                                          min_value=date(1995,1,1), max_value=date(2022,12,31))
+        with col4:
+            child_cls = st.selectbox("Child's Class / Grade", cls_opts, index=6)
+
+    div()
+    sec("Account credentials")
+    col5, col6 = st.columns(2)
+    with col5:
+        username = st.text_input("Username", placeholder="min 3 chars")
+    with col6:
+        password = st.text_input("Password", type="password", placeholder="min 6 chars")
+    confirm = st.text_input("Confirm Password", type="password", placeholder="re-enter password")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("Create Account →"):
+    if st.button("Create Account →", key="signup_btn"):
         users = load_users()
-        uname = username.strip().lower()
-        if not uname or not password or not confirm:
+        u = username.strip().lower()
+        if not full_name.strip() or not u or not password or not confirm:
             st.error("Please fill in all fields.")
-        elif len(uname) < 3:
+        elif len(u) < 3:
             st.error("Username must be at least 3 characters.")
-        elif uname in users:
-            st.error("Username already taken. Choose another.")
+        elif u in users:
+            st.error("Username already taken.")
         elif len(password) < 6:
             st.error("Password must be at least 6 characters.")
         elif password != confirm:
@@ -512,317 +403,311 @@ def signup_page():
         elif role_clean == "Parent" and not child_name.strip():
             st.error("Please enter your child's name.")
         else:
-            record = {"password": hash_password(password), "role": role_clean}
+            rec = dict(password=hp(password), role=role_clean,
+                       name=full_name.strip(), dob=str(dob), cls=student_cls)
             if role_clean == "Parent":
-                record["child_name"]  = child_name.strip()
-                record["child_dob"]   = str(child_dob)
-                record["child_class"] = child_class
-            users[uname] = record
+                rec["child_name"] = child_name.strip()
+                rec["child_dob"]  = str(child_dob_val)
+                rec["child_cls"]  = child_cls
+            users[u] = rec
             save_users(users)
             st.success(f"✅ Account created as **{role_clean}**! Please sign in.")
             st.balloons()
-
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:0.88rem;margin:0.5rem 0;">Already have an account?</p>', unsafe_allow_html=True)
-    st.markdown('<div class="secondary-btn">', unsafe_allow_html=True)
-    if st.button("Back to Sign In"):
-        st.session_state.page = "login"
-        st.rerun()
+    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:.86rem;margin:.4rem 0">Already have an account?</p>', unsafe_allow_html=True)
+    st.markdown('<div class="ghost">', unsafe_allow_html=True)
+    if st.button("Back to Sign In", key="go_login"):
+        st.session_state.page = "login"; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ================================================================
+# ══════════════════════════════════════════════════════════
 # PAGE 3 — PREDICTOR
-# ================================================================
+# ══════════════════════════════════════════════════════════
 def predictor_page():
     model, columns = load_model()
     users = load_users()
     uname = st.session_state.username
     user  = users.get(uname, {})
+    is_parent = st.session_state.role == "Parent"
 
-    # ── Sidebar ──
+    # ── Sidebar ──────────────────────────────────────────
     with st.sidebar:
-        theme_icon = "☀️ Light Mode" if st.session_state.dark_mode else "🌙 Dark Mode"
-        if st.button(theme_icon):
-            st.session_state.dark_mode = not st.session_state.dark_mode
-            st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
+        icon = "☀️ Light" if dm else "🌙 Dark"
+        if st.button(icon, key="sb_theme"):
+            st.session_state.dark = not st.session_state.dark; st.rerun()
 
         child_info = ""
-        if st.session_state.role == "Parent" and "child_name" in user:
-            child_info = f'<div class="sidebar-meta">👦 {user["child_name"]} · Class {user.get("child_class","")}</div>'
+        if is_parent and "child_name" in user:
+            age = calc_age(user.get("child_dob",""))
+            child_info = f'<br>👦 {user["child_name"]}<br>Class {user.get("child_cls","")}'
 
         st.markdown(f"""
-        <div class="sidebar-user">
-            <div class="sidebar-name">@{uname}</div>
-            <div class="sidebar-role">{st.session_state.role}</div>
-            {child_info}
+        <div class="sb-card">
+          <div class="sb-name">{user.get('name', uname)}</div>
+          <div class="sb-role">{st.session_state.role}</div>
+          <div class="sb-info">@{uname} · Age {calc_age(user.get('dob',''))}<br>Class {user.get('cls','')}
+          {child_info}</div>
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("🚪 Sign Out"):
-            for k in ["logged_in", "username", "role"]:
-                st.session_state[k] = False if k == "logged_in" else ""
-            st.session_state.page = "login"
-            st.rerun()
+        if st.button("🚪 Sign Out", key="logout"):
+            for k in ["logged_in","username","role"]:
+                st.session_state[k] = False if k=="logged_in" else ""
+            st.session_state.page = "login"; st.rerun()
 
-    # ── Header ──
-    st.markdown('<h1 class="logo-title">ScoreIQ</h1>', unsafe_allow_html=True)
-    is_parent = st.session_state.role == "Parent"
-    subtitle  = "Your child's academic snapshot" if is_parent else "Your academic snapshot"
-    st.markdown(f'<p class="logo-sub">{subtitle} — fill in the details below</p>', unsafe_allow_html=True)
+    # ── Header ───────────────────────────────────────────
+    st.markdown('<h1 class="app-logo">ScoreIQ</h1>', unsafe_allow_html=True)
+    sub = "Your child's performance predictor" if is_parent else "Your personal score predictor"
+    st.markdown(f'<p class="app-tagline">{sub}</p>', unsafe_allow_html=True)
 
-    # ── Student/Child Profile ──
-    st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-    section("🎓 Student Profile")
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
+    # ── Student Info card ─────────────────────────────────
+    st.markdown('<div class="card fade">', unsafe_allow_html=True)
+    sec("🧑 Student Information")
+    c1, c2, c3 = st.columns(3)
+    with c1:
         if is_parent and "child_name" in user:
-            st.text_input("Child's Name", value=user["child_name"], disabled=True)
+            s_name = st.text_input("Child's Name", value=user["child_name"], disabled=True)
         else:
-            st.text_input("Your Name", placeholder="Optional")
-        student_dob = st.date_input(
-            "Date of Birth",
-            value=date(int(user["child_dob"].split("-")[0]), int(user["child_dob"].split("-")[1]), int(user["child_dob"].split("-")[2])) if (is_parent and "child_dob" in user) else date(2005, 1, 1),
-            min_value=date(1990, 1, 1),
-            max_value=date(2020, 12, 31),
+            s_name = st.text_input("Your Name", value=user.get("name",""), disabled=True)
+    with c2:
+        default_cls = user.get("child_cls" if is_parent else "cls", "10")
+        cls_opts = ["1","2","3","4","5","6","7","8","9","10","11","12","College","Other"]
+        idx = cls_opts.index(default_cls) if default_cls in cls_opts else 9
+        student_class = st.selectbox("Class / Grade", cls_opts, index=idx)
+    with c3:
+        dob_key    = "child_dob" if is_parent else "dob"
+        age_val    = calc_age(user.get(dob_key, ""))
+        st.metric("Age", f"{age_val} yrs")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Academic Details ──────────────────────────────────
+    st.markdown('<div class="card fade">', unsafe_allow_html=True)
+    sec("📊 Academic Details")
+    c1, c2 = st.columns(2)
+    with c1:
+        hours    = st.number_input("Study Hours / day",  0.0, 24.0,  step=0.5, value=5.0)
+        previous = st.number_input("Previous Score",      0.0, 100.0, step=1.0, value=65.0)
+    with c2:
+        attendance = st.number_input("Attendance %",        0.0, 100.0, step=1.0, value=80.0)
+        sleep      = st.number_input("Sleep Hours / day",   0.0, 12.0,  step=0.5, value=7.0)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Environment ───────────────────────────────────────
+    st.markdown('<div class="card fade">', unsafe_allow_html=True)
+    sec("🏫 School & Environment")
+    c3, c4 = st.columns(2)
+    with c3:
+        motivation = st.selectbox("Motivation Level",     ["Low","Medium","High"], index=1)
+        teacher    = st.selectbox("Teacher Quality",      ["Poor","Average","Good"], index=1)
+        school     = st.selectbox("School Type",          ["Public","Private"])
+        internet   = st.selectbox("Internet Access",      ["Yes","No"])
+    with c4:
+        income     = st.selectbox("Family Income",        ["Low","Medium","High"], index=1)
+        parent_inv = st.selectbox("Parental Involvement", ["Low","Medium","High"], index=1)
+        education  = st.selectbox("Parent Education",     ["School","College"])
+        peer       = st.selectbox("Peer Influence",       ["Negative","Neutral","Positive"], index=1)
+    c5, c6 = st.columns(2)
+    with c5: resources  = st.selectbox("Learning Resources",          ["Low","Medium","High"], index=1)
+    with c6: activities = st.selectbox("Extracurricular Activities",  ["Yes","No"])
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Predict ───────────────────────────────────────────
+    if st.button("✦ Predict Score", key="predict"):
+        data = dict(
+            Hours_Studied=hours, Attendance=attendance,
+            Previous_Scores=previous, Sleep_Hours=sleep,
+            Motivation_Level=motivation, Teacher_Quality=teacher,
+            School_Type=school, Internet_Access=internet,
+            Family_Income=income, Parental_Involvement=parent_inv,
+            Parental_Education_Level=education, Peer_Influence=peer,
+            Learning_Resources=resources, Extracurricular_Activities=activities
         )
-    with col_p2:
-        student_class = st.selectbox(
-            "Class / Grade",
-            ["1","2","3","4","5","6","7","8","9","10","11","12","College"],
-            index=["1","2","3","4","5","6","7","8","9","10","11","12","College"].index(
-                user.get("child_class", "10") if is_parent else "10"
-            )
-        )
-        today = date.today()
-        age   = today.year - student_dob.year - ((today.month, today.day) < (student_dob.month, student_dob.day))
-        st.metric("Age", f"{age} years")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── Academic Details ──
-    st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-    section("📊 Academic Details")
-    col1, col2 = st.columns(2)
-    with col1:
-        hours    = st.number_input("Hours Studied / day", 0.0, 24.0,  step=0.5)
-        previous = st.number_input("Previous Score",       0.0, 100.0, step=1.0)
-    with col2:
-        attendance = st.number_input("Attendance %",         0.0, 100.0, step=1.0)
-        sleep      = st.number_input("Sleep Hours / day",    0.0, 12.0,  step=0.5)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── Environment ──
-    st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-    section("🏫 School & Environment")
-    col3, col4 = st.columns(2)
-    with col3:
-        motivation = st.selectbox("Motivation Level",      ["Low", "Medium", "High"])
-        teacher    = st.selectbox("Teacher Quality",       ["Poor", "Average", "Good"])
-        school     = st.selectbox("School Type",           ["Public", "Private"])
-        internet   = st.selectbox("Internet Access",       ["Yes", "No"])
-    with col4:
-        income     = st.selectbox("Family Income",         ["Low", "Medium", "High"])
-        parent_inv = st.selectbox("Parental Involvement",  ["Low", "Medium", "High"])
-        education  = st.selectbox("Parent Education",      ["School", "College"])
-        peer       = st.selectbox("Peer Influence",        ["Negative", "Neutral", "Positive"])
-    col5, col6 = st.columns(2)
-    with col5:
-        resources  = st.selectbox("Learning Resources",         ["Low", "Medium", "High"])
-    with col6:
-        activities = st.selectbox("Extracurricular Activities", ["Yes", "No"])
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── Predict ──
-    if st.button("✦ Predict Score"):
-        data = {
-            "Hours_Studied": hours, "Attendance": attendance,
-            "Previous_Scores": previous, "Sleep_Hours": sleep,
-            "Motivation_Level": motivation, "Teacher_Quality": teacher,
-            "School_Type": school, "Internet_Access": internet,
-            "Family_Income": income, "Parental_Involvement": parent_inv,
-            "Parental_Education_Level": education, "Peer_Influence": peer,
-            "Learning_Resources": resources, "Extracurricular_Activities": activities
-        }
-        df = pd.DataFrame([data])
-        df = pd.get_dummies(df)
+        df = pd.get_dummies(pd.DataFrame([data]))
         df = df.reindex(columns=columns, fill_value=0)
-
         raw         = model.predict(df)[0]
         final_score = int(round(max(40, min(100, raw))))
 
+        # Score category
         if final_score >= 75:
-            cls, emoji, remark, bar_color = "excellent", "🏆", "Outstanding — you're in the top tier!", T["green"]
-        elif final_score >= 55:
-            cls, emoji, remark, bar_color = "good", "📈", "Solid work — a bit more push gets you to excellence.", T["yellow"]
+            cls, emoji, remark, bcolor, grade = "ok",  "🏆", "Outstanding performance!", T["green"],  "A"
+        elif final_score >= 60:
+            cls, emoji, remark, bcolor, grade = "mid", "📈", "Good work — keep pushing!",  T["yellow"], "B"
+        elif final_score >= 45:
+            cls, emoji, remark, bcolor, grade = "mid", "📘", "Average — more effort needed.", T["yellow"], "C"
         else:
-            cls, emoji, remark, bar_color = "low", "📚", "Don't give up — small daily habits make a big difference.", T["red"]
+            cls, emoji, remark, bcolor, grade = "low", "📚", "Needs significant improvement.", T["red"],   "D"
 
-        # Score card
+        badge_cls = "badge-ok" if cls=="ok" else "badge-mid" if cls=="mid" else "badge-low"
+
+        # ── Score Hero ──
         st.markdown(f"""
-        <div class="score-card {cls}">
-            <div class="score-number {cls}">{emoji} {final_score}</div>
-            <div class="score-label">Predicted Score out of 100</div>
-            <div class="score-bar-wrap">
-                <div class="score-bar-fill" style="width:{final_score}%;background:{bar_color};"></div>
-            </div>
-            <div class="score-remark">{remark}</div>
+        <div class="score-hero {cls}">
+          <div class="score-big {cls}">{emoji} {final_score}</div>
+          <div class="score-tag">Predicted Score · out of 100</div>
+          <div class="bar-wrap">
+            <div class="bar-fill" style="width:{final_score}%;background:{bcolor};"></div>
+          </div>
+          <div class="score-note">{remark}</div>
         </div>
         """, unsafe_allow_html=True)
 
         # ══════════════════════════════════════════
-        # CHARTS
+        # SIMPLE BAR CHART — factor strengths
         # ══════════════════════════════════════════
-        st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-        section("📈 Performance Analytics")
+        st.markdown('<div class="card fade">', unsafe_allow_html=True)
+        sec("📊 Factor Strength Chart")
 
-        cfg = plot_cfg(T)
+        chart_data = pd.DataFrame({
+            "Factor": [
+                "Study Hours","Attendance","Sleep",
+                "Motivation","Peer Influence","Learning Resources",
+                "Internet","Teacher Quality"
+            ],
+            "Score (%)": [
+                min(round(hours/8*100), 100),
+                int(attendance),
+                min(round(sleep/9*100), 100),
+                {"Low":30,"Medium":65,"High":100}[motivation],
+                {"Negative":20,"Neutral":60,"Positive":100}[peer],
+                {"Low":30,"Medium":65,"High":100}[resources],
+                100 if internet=="Yes" else 35,
+                {"Poor":30,"Average":65,"Good":100}[teacher],
+            ]
+        }).set_index("Factor")
 
-        # ── CHART 1: Radar — key habit scores ──
-        radar_cats   = ["Study Hours", "Attendance", "Sleep", "Previous Score", "Score"]
-        raw_vals     = [hours, attendance, sleep, previous, final_score]
-        norm_vals    = [
-            min(hours / 8  * 100, 100),
-            attendance,
-            min(sleep / 9  * 100, 100),
-            previous,
-            final_score,
-        ]
-        fig_radar = go.Figure(go.Scatterpolar(
-            r    = norm_vals + [norm_vals[0]],
-            theta= radar_cats + [radar_cats[0]],
-            fill = "toself",
-            fillcolor= f"rgba(124,58,237,{'0.18' if st.session_state.dark_mode else '0.1'})",
-            line = dict(color=T["accent"], width=2),
-            name = "Your Profile"
-        ))
-        fig_radar.update_layout(
-            **cfg,
-            polar=dict(
-                bgcolor=T["plot_bg"],
-                radialaxis=dict(visible=True, range=[0, 100], color=T["muted"], gridcolor=T["plot_grid"]),
-                angularaxis=dict(color=T["plot_font"], gridcolor=T["plot_grid"]),
-            ),
-            showlegend=False,
-            title=dict(text="Habit Strength Radar", font=dict(color=T["text"], size=14)),
-        )
-        st.plotly_chart(fig_radar, use_container_width=True)
-
-        # ── CHART 2: Horizontal bar — factor impact ──
-        factors = {
-            "Study Hours":      min(hours / 8  * 100, 100),
-            "Attendance":       attendance,
-            "Sleep Quality":    min(sleep / 9  * 100, 100),
-            "Motivation":       {"Low": 30, "Medium": 65, "High": 100}[motivation],
-            "Peer Influence":   {"Negative": 20, "Neutral": 60, "Positive": 100}[peer],
-            "Learning Res.":    {"Low": 30, "Medium": 65, "High": 100}[resources],
-            "Internet Access":  100 if internet == "Yes" else 35,
-            "Teacher Quality":  {"Poor": 30, "Average": 65, "Good": 100}[teacher],
-        }
-        fac_df = pd.DataFrame({
-            "Factor": list(factors.keys()),
-            "Score":  list(factors.values())
-        }).sort_values("Score")
-
-        bar_colors = [T["red"] if v < 45 else T["yellow"] if v < 70 else T["green"] for v in fac_df["Score"]]
-
-        fig_bar = go.Figure(go.Bar(
-            x=fac_df["Score"], y=fac_df["Factor"],
-            orientation="h",
-            marker=dict(color=bar_colors, line=dict(width=0)),
-            text=[f"{v:.0f}%" for v in fac_df["Score"]],
-            textposition="outside",
-            textfont=dict(color=T["muted"], size=11),
-        ))
-        fig_bar.update_layout(
-            **cfg,
-            xaxis=dict(range=[0, 115], showgrid=True, gridcolor=T["plot_grid"], color=T["muted"], ticksuffix="%"),
-            yaxis=dict(color=T["text"], tickfont=dict(size=11)),
-            title=dict(text="Factor Impact Scores", font=dict(color=T["text"], size=14)),
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-        # ── CHART 3: Gauge — final score ──
-        gauge_color = (
-            T["green"]  if final_score >= 75 else
-            T["yellow"] if final_score >= 55 else
-            T["red"]
-        )
-        fig_gauge = go.Figure(go.Indicator(
-            mode  = "gauge+number+delta",
-            value = final_score,
-            delta = {"reference": previous, "valueformat": ".0f",
-                     "increasing": {"color": T["green"]},
-                     "decreasing": {"color": T["red"]}},
-            title = {"text": "Predicted vs Previous Score", "font": {"color": T["text"], "size": 14}},
-            number= {"font": {"color": T["text"], "size": 48}},
-            gauge = {
-                "axis":  {"range": [0, 100], "tickcolor": T["muted"], "tickwidth": 1},
-                "bar":   {"color": gauge_color, "thickness": 0.25},
-                "bgcolor": T["plot_bg"],
-                "borderwidth": 0,
-                "steps": [
-                    {"range": [0,  55], "color": f"rgba(248,113,113,{'0.15' if st.session_state.dark_mode else '0.1'})"},
-                    {"range": [55, 75], "color": f"rgba(251,191,36,{'0.15' if st.session_state.dark_mode else '0.1'})"},
-                    {"range": [75,100], "color": f"rgba(52,211,153,{'0.15' if st.session_state.dark_mode else '0.1'})"},
-                ],
-                "threshold": {
-                    "line": {"color": T["accent"], "width": 3},
-                    "thickness": 0.8,
-                    "value": previous
-                }
-            }
-        ))
-        fig_gauge.update_layout(**cfg, height=300)
-        st.plotly_chart(fig_gauge, use_container_width=True)
-
+        st.bar_chart(chart_data, use_container_width=True, height=260)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── Suggestions ──
-        suggestions = []
-        if hours < 4:
-            suggestions.append(("📖", "Study More Hours", "You're studying less than 4 hrs/day. Aim for 5–6 focused hours using the Pomodoro technique."))
-        if attendance < 75:
-            suggestions.append(("🏫", "Improve Attendance", "Attendance below 75% means missed lessons. Try to attend every session."))
-        if sleep < 6:
-            suggestions.append(("😴", "Prioritise Sleep", "Less than 6 hrs hurts memory & focus. Aim for 7–8 hrs every night."))
-        if motivation == "Low":
-            suggestions.append(("💪", "Build Motivation", "Set small weekly goals, reward progress, and track daily streaks."))
-        if peer == "Negative":
-            suggestions.append(("👫", "Choose Positive Peers", "Spend more time with focused, encouraging classmates."))
-        if internet == "No":
-            suggestions.append(("🌐", "Get Online Access", "Khan Academy, YouTube, and NCERT PDFs are free and highly effective."))
-        if resources == "Low":
-            suggestions.append(("📚", "Get Better Resources", "Visit the library, join a study group, or ask for extra materials."))
-        if activities == "No":
-            suggestions.append(("⚽", "Join Activities", "Extracurriculars improve discipline and mental health — both help academics."))
-        if teacher == "Poor":
-            suggestions.append(("🎧", "Self-Study More", "Supplement poor classroom teaching with YouTube lectures or tuition."))
-        if parent_inv == "Low":
-            suggestions.append(("🏠", "Involve Parents", "Students with engaged parents consistently perform better. Share your goals."))
-        if not suggestions:
-            suggestions.append(("✅", "Excellent Habits!", "All your inputs are strong. Keep consistency — you're on the path to topping the exam!"))
+        # ══════════════════════════════════════════
+        # REPORT CARD
+        # ══════════════════════════════════════════
+        today_str   = date.today().strftime("%d %B %Y")
+        sname_disp  = user.get("child_name" if is_parent else "name", uname)
+        age_disp    = calc_age(user.get("child_dob" if is_parent else "dob", ""))
 
-        st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-        section("💡 Personalised Suggestions")
-        for icon, title, text in suggestions:
+        st.markdown('<div class="card fade">', unsafe_allow_html=True)
+        sec("📋 Student Report Card")
+
+        st.markdown(f"""
+        <div class="report-wrap">
+          <div class="report-title">📄 Academic Performance Report</div>
+          <div class="report-sub">Generated on {today_str} &nbsp;·&nbsp; ScoreIQ</div>
+
+          <div class="report-row">
+            <span class="report-key">Student Name</span>
+            <span class="report-val">{sname_disp}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Class / Grade</span>
+            <span class="report-val">Class {student_class}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Age</span>
+            <span class="report-val">{age_disp} years</span>
+          </div>
+
+          <div class="report-row">
+            <span class="report-key">Previous Score</span>
+            <span class="report-val">{int(previous)} / 100</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Predicted Score</span>
+            <span class="report-val" style="font-size:1.05rem;color:{bcolor}">
+              {final_score} / 100 &nbsp;<span class="badge {badge_cls}">{grade}</span>
+            </span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Score Change</span>
+            <span class="report-val" style="color:{'#34d399' if final_score>=previous else '#f87171'}">
+              {'▲' if final_score>=previous else '▼'} {abs(final_score-int(previous))} pts
+            </span>
+          </div>
+
+          <div class="report-row">
+            <span class="report-key">Study Hours / day</span>
+            <span class="report-val">{hours} hrs</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Attendance</span>
+            <span class="report-val">{int(attendance)}%</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Sleep Hours / day</span>
+            <span class="report-val">{sleep} hrs</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">School Type</span>
+            <span class="report-val">{school}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Internet Access</span>
+            <span class="report-val">{internet}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Motivation Level</span>
+            <span class="report-val">{motivation}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Peer Influence</span>
+            <span class="report-val">{peer}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Teacher Quality</span>
+            <span class="report-val">{teacher}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Parental Involvement</span>
+            <span class="report-val">{parent_inv}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Learning Resources</span>
+            <span class="report-val">{resources}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Extracurricular Activities</span>
+            <span class="report-val">{activities}</span>
+          </div>
+          <div class="report-row">
+            <span class="report-key">Overall Grade</span>
+            <span class="badge {badge_cls}" style="font-size:.85rem;padding:.3rem 1rem;">{grade} — {remark}</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # ══════════════════════════════════════════
+        # SUGGESTIONS
+        # ══════════════════════════════════════════
+        tips = []
+        if hours < 4:    tips.append(("📖","Study More","Aim for 5–6 focused study hours/day. Try the Pomodoro technique: 25 min study, 5 min break."))
+        if attendance<75: tips.append(("🏫","Boost Attendance","Below 75% attendance means missed lessons. Every class matters — try not to skip."))
+        if sleep < 6:    tips.append(("😴","Sleep Better","Less than 6 hrs of sleep impairs memory. Target 7–8 hrs every night for better retention."))
+        if motivation=="Low": tips.append(("💪","Build Motivation","Set small daily goals. Track your streaks. Reward yourself for consistency."))
+        if peer=="Negative": tips.append(("👫","Positive Peers","Surround yourself with focused classmates — their habits will positively influence you."))
+        if internet=="No": tips.append(("🌐","Get Online Access","Khan Academy, YouTube, and NCERT PDFs are free & powerful. Try to access them regularly."))
+        if resources=="Low": tips.append(("📚","Better Resources","Visit your school library, join study groups, or request extra materials from your teacher."))
+        if activities=="No": tips.append(("⚽","Join Activities","Extracurriculars build discipline, reduce stress, and indirectly improve academic focus."))
+        if teacher=="Poor": tips.append(("🎧","Self Study","Supplement with YouTube lectures (NCERT, Unacademy, Khan Academy) to fill classroom gaps."))
+        if parent_inv=="Low": tips.append(("🏠","Parent Support","Share your study goals with family. Involved parents help students perform significantly better."))
+        if not tips: tips.append(("✅","All Good!","Great habits all around! Stay consistent and you're well on your way to topping the exam."))
+
+        st.markdown('<div class="card fade">', unsafe_allow_html=True)
+        sec("💡 Personalised Suggestions")
+        for icon, title, body in tips:
             st.markdown(f"""
-            <div class="suggestion-item">
-                <div class="suggestion-icon">{icon}</div>
-                <div class="suggestion-text">
-                    <div class="suggestion-title">{title}</div>
-                    {text}
-                </div>
+            <div class="sug">
+              <div class="sug-icon">{icon}</div>
+              <div class="sug-body"><div class="sug-title">{title}</div>{body}</div>
             </div>
             """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ================================================================
+# ══════════════════════════════════════════════════════════
 # ROUTER
-# ================================================================
+# ══════════════════════════════════════════════════════════
 if st.session_state.logged_in:
     predictor_page()
 elif st.session_state.page == "signup":
