@@ -1,688 +1,462 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║              ScoreIQ  —  Complete Professional App           ║
+# ║   Dashboard · Predictor · Results · Profile · PDF · WhatsApp ║
+# ╚══════════════════════════════════════════════════════════════╝
+
 import streamlit as st
-import joblib
-import pandas as pd
-import json
-import os
-import hashlib
+import joblib, pandas as pd, json, os, hashlib, io, base64, random, string
 from datetime import date, datetime
-import io
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.backends.backend_pdf import PdfPages
-import numpy as np
 
-# ══════════════════════════════════════════════════════════
-# PAGE CONFIG
-# ══════════════════════════════════════════════════════════
-st.set_page_config(page_title="ScoreIQ", page_icon="🎓", layout="centered")
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.lib import colors
+from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                Table, TableStyle, PageBreak, HRFlowable)
+from reportlab.graphics.shapes import Drawing, Rect, String, Line
+from reportlab.graphics.charts.piecharts import Pie
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-# ══════════════════════════════════════════════════════════
-# SESSION STATE
-# ══════════════════════════════════════════════════════════
-defaults = dict(logged_in=False, username="", role="",
-                page="login", dark=True, result=None)
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+# ──────────────────────────────────────────────────────────────
+# CONFIG
+# ──────────────────────────────────────────────────────────────
+st.set_page_config(page_title="ScoreIQ", page_icon="🎓", layout="wide",
+                   initial_sidebar_state="expanded")
 
-# ══════════════════════════════════════════════════════════
-# THEME
-# ══════════════════════════════════════════════════════════
-def get_theme(dark):
+# ──────────────────────────────────────────────────────────────
+# SESSION DEFAULTS
+# ──────────────────────────────────────────────────────────────
+_D = dict(logged_in=False, username="", role="", page="login",
+          dark=True, nav="dashboard", result=None, otp_store={})
+for k, v in _D.items():
+    if k not in st.session_state: st.session_state[k] = v
+
+# ──────────────────────────────────────────────────────────────
+# THEME SYSTEM  — rebuilt every render so toggle is instant
+# ──────────────────────────────────────────────────────────────
+def theme(dark):
     if dark:
         return dict(
-            bg="#07080f",
-            bg2="#0d1017",
-            bg3="#12161f",
-            card="#0f1420",
-            border="#1c2538",
-            border2="#232d42",
-            text="#eef2ff",
-            text2="#a8b3cf",
-            muted="#5c6b8a",
-            faint="#2d3a52",
-            # Signature accent: electric indigo + aurora teal
-            accent="#818cf8",        # indigo-400
-            accent2="#34d399",       # emerald-400
-            accent3="#f472b6",       # pink-400
-            accentDeep="#6366f1",    # indigo-500
-            green="#34d399",
-            yellow="#fbbf24",
-            red="#fb7185",
-            inp="#090c14",
-            nav_bg="#09100d",
-            shadow="0 20px 60px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.4)",
-            card_shadow="0 8px 32px rgba(0,0,0,0.5)",
-            btn_txt="#ffffff",
-            btn_grad="linear-gradient(135deg, #6366f1 0%, #818cf8 50%, #34d399 100%)",
-            btn_shadow="0 4px 24px rgba(99,102,241,0.4)",
-            glow="#6366f1",
-            tag_bg="rgba(129,140,248,0.1)",
-            focus_ring="rgba(99,102,241,0.25)",
-            gradient_hero="linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(52,211,153,0.08) 100%)",
-            score_ok_bg="linear-gradient(135deg, rgba(52,211,153,0.12), rgba(16,185,129,0.06))",
-            score_mid_bg="linear-gradient(135deg, rgba(251,191,36,0.12), rgba(245,158,11,0.06))",
-            score_low_bg="linear-gradient(135deg, rgba(251,113,133,0.12), rgba(244,63,94,0.06))",
+            PAGE      = "#080c14",
+            SIDEBAR   = "#0d1220",
+            CARD      = "#111827",
+            CARD2     = "#161f30",
+            BORDER    = "#1e2d45",
+            BORDER2   = "#263650",
+            TEXT      = "#edf2ff",
+            TEXT2     = "#8ea3c3",
+            MUTED     = "#4d6080",
+            FAINT     = "#253045",
+            ACCENT    = "#6366f1",   # indigo
+            ACCENT2   = "#06b6d4",   # cyan
+            ACCENT3   = "#f472b6",   # pink
+            GREEN     = "#10b981",
+            YELLOW    = "#f59e0b",
+            RED       = "#ef4444",
+            GRAD      = "linear-gradient(135deg,#6366f1,#06b6d4)",
+            GRAD2     = "linear-gradient(135deg,#f472b6,#6366f1)",
+            SHADOW    = "0 8px 40px rgba(0,0,0,.55)",
+            SHADOW2   = "0 2px 16px rgba(0,0,0,.35)",
+            INP       = "#0d1220",
+            TAG       = "rgba(99,102,241,.12)",
+            TAG2      = "rgba(6,182,212,.10)",
+            ACTIVE    = "rgba(99,102,241,.13)",
+            BTN_TXT   = "#ffffff",
         )
     else:
         return dict(
-            bg="#f8f9ff",
-            bg2="#ffffff",
-            bg3="#f0f2ff",
-            card="#ffffff",
-            border="#e2e5f5",
-            border2="#d4d8f0",
-            text="#0f1135",
-            text2="#3d4472",
-            muted="#7480a8",
-            faint="#b8bdd8",
-            accent="#5b5ef4",
-            accent2="#059669",
-            accent3="#db2777",
-            accentDeep="#4338ca",
-            green="#059669",
-            yellow="#b45309",
-            red="#e11d48",
-            inp="#f5f6ff",
-            nav_bg="#ffffff",
-            shadow="0 8px 40px rgba(91,94,244,0.12), 0 2px 8px rgba(0,0,0,0.04)",
-            card_shadow="0 4px 20px rgba(91,94,244,0.08)",
-            btn_txt="#ffffff",
-            btn_grad="linear-gradient(135deg, #4338ca 0%, #5b5ef4 50%, #059669 100%)",
-            btn_shadow="0 4px 20px rgba(67,56,202,0.35)",
-            glow="#5b5ef4",
-            tag_bg="rgba(91,94,244,0.08)",
-            focus_ring="rgba(91,94,244,0.2)",
-            gradient_hero="linear-gradient(135deg, rgba(91,94,244,0.08) 0%, rgba(5,150,105,0.05) 100%)",
-            score_ok_bg="linear-gradient(135deg, rgba(5,150,105,0.08), rgba(16,185,129,0.04))",
-            score_mid_bg="linear-gradient(135deg, rgba(180,83,9,0.08), rgba(245,158,11,0.04))",
-            score_low_bg="linear-gradient(135deg, rgba(225,29,72,0.08), rgba(244,63,94,0.04))",
+            PAGE      = "#f1f4fd",
+            SIDEBAR   = "#ffffff",
+            CARD      = "#ffffff",
+            CARD2     = "#f8faff",
+            BORDER    = "#dde3f5",
+            BORDER2   = "#c8d2ec",
+            TEXT      = "#0f172a",
+            TEXT2     = "#475569",
+            MUTED     = "#7c8db5",
+            FAINT     = "#e8edf8",
+            ACCENT    = "#4f46e5",
+            ACCENT2   = "#0891b2",
+            ACCENT3   = "#db2777",
+            GREEN     = "#059669",
+            YELLOW    = "#d97706",
+            RED       = "#dc2626",
+            GRAD      = "linear-gradient(135deg,#4f46e5,#0891b2)",
+            GRAD2     = "linear-gradient(135deg,#db2777,#4f46e5)",
+            SHADOW    = "0 4px 24px rgba(79,70,229,.10)",
+            SHADOW2   = "0 2px 10px rgba(79,70,229,.07)",
+            INP       = "#f8faff",
+            TAG       = "rgba(79,70,229,.07)",
+            TAG2      = "rgba(8,145,178,.07)",
+            ACTIVE    = "rgba(79,70,229,.08)",
+            BTN_TXT   = "#ffffff",
         )
 
-T  = get_theme(st.session_state.dark)
-dm = st.session_state.dark
+T  = theme(st.session_state.dark)
+DK = st.session_state.dark
 
-# ══════════════════════════════════════════════════════════
-# CSS — Premium redesign
-# ══════════════════════════════════════════════════════════
+# ──────────────────────────────────────────────────────────────
+# INJECT CSS
+# ──────────────────────────────────────────────────────────────
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;0,700;1,500;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
 
-*, *::before, *::after {{ box-sizing: border-box; margin:0; }}
+*,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
+html,body,[class*="css"]{{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  background:{T['PAGE']} !important;
+  color:{T['TEXT']} !important;
+  -webkit-font-smoothing:antialiased;
+}}
+#MainMenu,footer,header{{visibility:hidden}}
+.block-container{{padding:0!important;max-width:100%!important}}
+.stApp{{background:{T['PAGE']}!important}}
 
-html, body, [class*="css"] {{
-  font-family: 'Outfit', sans-serif;
-  background: {T['bg']} !important;
-  color: {T['text']} !important;
+/* ━━━━━━━━━━━━ SIDEBAR ━━━━━━━━━━━━ */
+section[data-testid="stSidebar"]{{
+  background:{T['SIDEBAR']}!important;
+  border-right:1px solid {T['BORDER']}!important;
+  min-width:260px!important; max-width:260px!important;
 }}
+section[data-testid="stSidebar"]>div{{padding:0!important}}
+[data-testid="collapsedControl"]{{display:none!important}}
 
-#MainMenu, footer, header {{ visibility: hidden; }}
-.block-container {{ padding-top: 2rem; padding-bottom: 5rem; max-width: 760px; }}
-.stApp {{ background: {T['bg']} !important; min-height: 100vh; }}
+/* ━━━━━━━━━━━━ BUTTONS ━━━━━━━━━━━━ */
+.stButton>button{{
+  background:{T['GRAD']}!important;
+  color:#fff!important; border:none!important; border-radius:12px!important;
+  padding:.68rem 1.4rem!important; font-family:'Plus Jakarta Sans',sans-serif!important;
+  font-size:.88rem!important; font-weight:700!important; width:100%!important;
+  transition:all .22s!important;
+  box-shadow:0 4px 18px {'rgba(99,102,241,.35)' if DK else 'rgba(79,70,229,.22)'}!important;
+  letter-spacing:.01em!important;
+}}
+.stButton>button:hover{{
+  transform:translateY(-2px)!important;
+  box-shadow:0 8px 26px {'rgba(99,102,241,.5)' if DK else 'rgba(79,70,229,.32)'}!important;
+  filter:brightness(1.07)!important;
+}}
+.stButton>button:active{{transform:translateY(0)!important}}
 
-/* ── Noise texture overlay ── */
-.stApp::before {{
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 0;
-  opacity: {'0.6' if dm else '0.3'};
+.ghost>button{{
+  background:transparent!important; border:1.5px solid {T['BORDER']}!important;
+  color:{T['MUTED']}!important; box-shadow:none!important;
 }}
-
-/* ── Logo ── */
-.logo-wrap {{ text-align: center; margin-bottom: .3rem; padding-top: .5rem; }}
-.logo {{
-  font-family: 'Lora', serif;
-  font-size: 3rem;
-  font-weight: 700;
-  background: {T['btn_grad']};
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -1.5px;
-  line-height: 1.1;
-}}
-.tagline {{
-  text-align: center;
-  color: {T['muted']};
-  font-size: .72rem;
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  margin-bottom: 2rem;
-  font-weight: 500;
-}}
-
-/* ── Cards ── */
-.card {{
-  background: {T['card']};
-  border: 1px solid {T['border']};
-  border-radius: 20px;
-  padding: 1.6rem 1.8rem;
-  margin-bottom: 1.2rem;
-  box-shadow: {T['card_shadow']};
-  position: relative;
-  overflow: hidden;
-  transition: transform .28s cubic-bezier(.22,1,.36,1),
-              box-shadow .28s cubic-bezier(.22,1,.36,1),
-              border-color .28s ease;
-}}
-.card:hover {{
-  transform: translateY(-4px);
-  border-color: {T['accent']};
-  box-shadow: 0 16px 48px {'rgba(99,102,241,0.18)' if dm else 'rgba(91,94,244,0.14)'},
-              0 4px 12px {'rgba(0,0,0,0.4)' if dm else 'rgba(0,0,0,0.06)'};
-}}
-.card::before {{
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: {T['btn_grad']};
-  opacity: 0.6;
-  transition: opacity .28s;
-}}
-.card:hover::before {{ opacity: 1; }}
-
-/* ── Section labels ── */
-.sec-label {{
-  font-size: .65rem;
-  font-weight: 700;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-  color: {T['accent']};
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-}}
-.sec-label::after {{
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: {T['border']};
+.ghost>button:hover{{
+  border-color:{T['ACCENT']}!important; color:{T['ACCENT']}!important;
+  background:{T['TAG']}!important; transform:none!important;
+  box-shadow:none!important; filter:none!important;
 }}
 
-/* ── Divider ── */
-.hdiv {{ border: none; height: 1px; background: {T['border']}; margin: 1.1rem 0; opacity: .6; }}
-
-/* ── Widget labels ── */
-label, .stSelectbox label, .stNumberInput label,
-.stTextInput label, .stRadio label, .stDateInput label {{
-  color: {T['muted']} !important;
-  font-size: .75rem !important;
-  font-weight: 600 !important;
-  letter-spacing: .04em !important;
+.stDownloadButton>button{{
+  background:{T['GRAD']}!important; color:#fff!important; border:none!important;
+  border-radius:12px!important; padding:.68rem 1.4rem!important;
+  font-weight:700!important; width:100%!important;
+  font-family:'Plus Jakarta Sans',sans-serif!important; font-size:.88rem!important;
+  box-shadow:0 4px 18px {'rgba(99,102,241,.35)' if DK else 'rgba(79,70,229,.22)'}!important;
+  transition:all .22s!important;
+}}
+.stDownloadButton>button:hover{{
+  transform:translateY(-2px)!important; filter:brightness(1.07)!important;
 }}
 
-/* ── Inputs ── */
-input, .stTextInput input, .stNumberInput input {{
-  background: {T['inp']} !important;
-  border: 1.5px solid {T['border']} !important;
-  border-radius: 12px !important;
-  color: {T['text']} !important;
-  font-family: 'Outfit', sans-serif !important;
-  font-size: .88rem !important;
-  transition: border-color .2s, box-shadow .2s, background .2s !important;
+/* ━━━━━━━━━━━━ INPUTS ━━━━━━━━━━━━ */
+label,.stSelectbox label,.stNumberInput label,
+.stTextInput label,.stRadio label,.stDateInput label{{
+  color:{T['MUTED']}!important; font-size:.72rem!important;
+  font-weight:600!important; letter-spacing:.06em!important;
+  text-transform:uppercase!important;
 }}
-input:hover {{
-  border-color: {T['muted']} !important;
-  background: {T['bg3']} !important;
+input,.stTextInput input,.stNumberInput input{{
+  background:{T['INP']}!important; border:1.5px solid {T['BORDER']}!important;
+  border-radius:11px!important; color:{T['TEXT']}!important;
+  font-family:'Plus Jakarta Sans',sans-serif!important; font-size:.9rem!important;
+  padding:.55rem .9rem!important;
 }}
-input:focus {{
-  border-color: {T['accent']} !important;
-  box-shadow: 0 0 0 4px {T['focus_ring']} !important;
-  outline: none !important;
+input:focus{{
+  border-color:{T['ACCENT']}!important;
+  box-shadow:0 0 0 3px {'rgba(99,102,241,.18)' if DK else 'rgba(79,70,229,.14)'}!important;
+  outline:none!important;
 }}
-
-/* ── Selectbox ── */
-.stSelectbox > div > div {{
-  background: {T['inp']} !important;
-  border: 1.5px solid {T['border']} !important;
-  border-radius: 12px !important;
-  color: {T['text']} !important;
-  transition: border-color .2s, background .2s, box-shadow .2s !important;
+.stSelectbox>div>div{{
+  background:{T['INP']}!important; border:1.5px solid {T['BORDER']}!important;
+  border-radius:11px!important; color:{T['TEXT']}!important;
 }}
-.stSelectbox > div > div:hover {{
-  border-color: {T['muted']} !important;
-  background: {T['bg3']} !important;
+[data-baseweb="popover"] ul{{background:{T['CARD2']}!important; border:1px solid {T['BORDER']}!important}}
+[data-baseweb="popover"] li{{color:{T['TEXT']}!important}}
+[data-baseweb="popover"] li:hover{{background:{T['FAINT']}!important}}
+.stDateInput>div>div{{
+  background:{T['INP']}!important; border:1.5px solid {T['BORDER']}!important;
+  border-radius:11px!important; color:{T['TEXT']}!important;
 }}
-.stSelectbox > div > div:focus-within {{
-  border-color: {T['accent']} !important;
-  box-shadow: 0 0 0 4px {T['focus_ring']} !important;
+[data-testid="stNumberInput"] button{{
+  background:{T['CARD2']}!important; border-color:{T['BORDER']}!important;
+  color:{T['TEXT']}!important;
 }}
-[data-baseweb="popover"] ul {{
-  background: {T['card']} !important;
-  border: 1px solid {T['border']} !important;
-  border-radius: 14px !important;
-  box-shadow: {T['shadow']} !important;
-}}
-[data-baseweb="popover"] li {{ color: {T['text']} !important; border-radius: 8px !important; }}
-[data-baseweb="popover"] li:hover {{ background: {T['bg3']} !important; }}
-
-/* ── Date ── */
-.stDateInput > div > div {{
-  background: {T['inp']} !important;
-  border: 1.5px solid {T['border']} !important;
-  border-radius: 12px !important;
+textarea{{
+  background:{T['INP']}!important; border:1.5px solid {T['BORDER']}!important;
+  border-radius:11px!important; color:{T['TEXT']}!important;
+  font-family:'Plus Jakarta Sans',sans-serif!important;
 }}
 
-/* ── Number ── */
-[data-testid="stNumberInput"] button {{
-  background: {T['bg3']} !important;
-  border-color: {T['border']} !important;
-  color: {T['text']} !important;
-  border-radius: 8px !important;
+/* Radio pills */
+.stRadio>div{{flex-direction:row!important; gap:.45rem!important; flex-wrap:wrap!important}}
+.stRadio>div>label{{
+  background:{T['CARD2']}!important; border:1.5px solid {T['BORDER']}!important;
+  border-radius:99px!important; padding:.38rem .95rem!important;
+  cursor:pointer!important; transition:all .18s!important;
+  color:{T['MUTED']}!important; font-size:.82rem!important;
+  font-weight:500!important; text-transform:none!important;
+  letter-spacing:0!important;
+}}
+.stRadio>div>label:has(input:checked){{
+  border-color:{T['ACCENT']}!important; background:{T['TAG']}!important;
+  color:{T['ACCENT']}!important; font-weight:700!important;
 }}
 
-/* ── Radio pills ── */
-.stRadio > div {{ flex-direction: row !important; gap: .5rem !important; flex-wrap: wrap !important; }}
-.stRadio > div > label {{
-  background: {T['bg3']} !important;
-  border: 1.5px solid {T['border']} !important;
-  border-radius: 99px !important;
-  padding: .4rem 1.1rem !important;
-  cursor: pointer !important;
-  transition: all .22s cubic-bezier(.22,1,.36,1) !important;
-  color: {T['muted']} !important;
-  font-size: .82rem !important;
-  font-weight: 500 !important;
+/* ━━━━━━━━━━━━ METRIC ━━━━━━━━━━━━ */
+[data-testid="stMetric"]{{
+  background:{T['CARD2']}!important; border:1px solid {T['BORDER']}!important;
+  border-radius:14px!important; padding:.75rem 1rem!important;
 }}
-.stRadio > div > label:hover {{
-  border-color: {T['accent']} !important;
-  color: {T['accent']} !important;
-  background: {T['tag_bg']} !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 4px 12px {T['focus_ring']} !important;
+[data-testid="stMetricValue"]{{
+  color:{T['ACCENT']}!important; font-size:1.5rem!important;
+  font-weight:800!important; font-family:'Sora',sans-serif!important;
 }}
-.stRadio > div > label:has(input:checked) {{
-  border-color: {T['accent']} !important;
-  background: {T['tag_bg']} !important;
-  color: {T['accent']} !important;
-  font-weight: 700 !important;
-  box-shadow: 0 0 14px {T['focus_ring']} !important;
+[data-testid="stMetricLabel"]{{
+  color:{T['MUTED']}!important; font-size:.68rem!important;
+  text-transform:uppercase!important; letter-spacing:.07em!important;
 }}
 
-/* ── Primary button ── */
-.stButton > button {{
-  width: 100% !important;
-  background: {T['btn_grad']} !important;
-  color: {T['btn_txt']} !important;
-  border: none !important;
-  border-radius: 14px !important;
-  padding: .78rem 1.5rem !important;
-  font-family: 'Outfit', sans-serif !important;
-  font-size: .9rem !important;
-  font-weight: 700 !important;
-  cursor: pointer !important;
-  transition: all .25s ease !important;
-  box-shadow: {T['btn_shadow']} !important;
-  letter-spacing: .03em !important;
-}}
-.stButton > button:hover {{
-  transform: translateY(-3px) scale(1.01) !important;
-  box-shadow: 0 8px 32px {T['focus_ring']} !important;
-  filter: brightness(1.1) !important;
-}}
-.stButton > button:active {{ transform: translateY(0) scale(0.99) !important; }}
+/* ━━━━━━━━━━━━ ALERTS ━━━━━━━━━━━━ */
+.stAlert{{border-radius:13px!important}}
 
-/* ── Ghost button ── */
-.ghost-btn > button {{
-  background: transparent !important;
-  border: 1.5px solid {T['border']} !important;
-  color: {T['muted']} !important;
-  box-shadow: none !important;
-}}
-.ghost-btn > button:hover {{
-  border-color: {T['accent']} !important;
-  color: {T['accent']} !important;
-  background: {T['tag_bg']} !important;
-  transform: none !important;
-  filter: none !important;
+/* ━━━━━━━━━━━━ FILE UPLOADER ━━━━━━━━━━━━ */
+[data-testid="stFileUploader"]{{
+  background:{T['CARD2']}!important; border:2px dashed {T['BORDER']}!important;
+  border-radius:14px!important;
 }}
 
-/* ── Download button ── */
-.stDownloadButton > button {{
-  width: 100% !important;
-  background: {T['btn_grad']} !important;
-  color: {T['btn_txt']} !important;
-  border: none !important;
-  border-radius: 14px !important;
-  padding: .78rem 1.5rem !important;
-  font-weight: 700 !important;
-  font-family: 'Outfit', sans-serif !important;
-  font-size: .9rem !important;
-  box-shadow: {T['btn_shadow']} !important;
-  transition: all .25s !important;
+/* ━━━━━━━━━━━━ UTILITY CLASSES ━━━━━━━━━━━━ */
+.card{{
+  background:{T['CARD']}; border:1px solid {T['BORDER']};
+  border-radius:18px; padding:1.5rem 1.6rem;
+  margin-bottom:1.2rem; box-shadow:{T['SHADOW2']};
 }}
-.stDownloadButton > button:hover {{
-  transform: translateY(-3px) !important;
-  filter: brightness(1.1) !important;
+.sec-lbl{{
+  font-size:.64rem; font-weight:800; letter-spacing:.2em;
+  text-transform:uppercase; color:{T['ACCENT']}; margin-bottom:.85rem;
+}}
+.hdiv{{border:none;height:1px;background:{T['BORDER']};margin:.9rem 0}}
+
+/* ━━━━━━━━━━━━ AUTH PAGES ━━━━━━━━━━━━ */
+.auth-bg{{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:2rem; background:{T['PAGE']};
+}}
+.auth-card{{
+  width:100%; max-width:450px;
+  background:{T['CARD']}; border:1px solid {T['BORDER']};
+  border-radius:26px; padding:2.6rem 2.4rem;
+  box-shadow:{T['SHADOW']};
+}}
+.auth-logo{{
+  font-family:'Sora',sans-serif; font-size:2.1rem; font-weight:800;
+  text-align:center; margin-bottom:.2rem;
+  background:{T['GRAD']}; -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}}
+.auth-tag{{
+  text-align:center; color:{T['MUTED']}; font-size:.72rem;
+  letter-spacing:.12em; text-transform:uppercase; margin-bottom:1.8rem;
 }}
 
-/* ── Score hero ── */
-.score-hero {{
-  border-radius: 20px;
-  padding: 2.4rem 1.5rem 2rem;
-  text-align: center;
-  margin: 1.2rem 0;
-  animation: fadeUp .6s cubic-bezier(.22,1,.36,1);
-  position: relative;
-  overflow: hidden;
-  transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s ease;
-  cursor: default;
+/* ━━━━━━━━━━━━ SIDEBAR INNER ━━━━━━━━━━━━ */
+.sb{{padding:1.4rem 1.1rem; height:100vh; display:flex; flex-direction:column; overflow-y:auto}}
+.sb-logo{{
+  display:flex; align-items:center; gap:10px;
+  padding-bottom:1.3rem; border-bottom:1px solid {T['BORDER']};
+  margin-bottom:1.3rem;
 }}
-.score-hero:hover {{
-  transform: translateY(-5px) scale(1.01);
-  box-shadow: 0 24px 60px {'rgba(99,102,241,0.22)' if dm else 'rgba(91,94,244,0.18)'};
+.sb-logo-icon{{
+  width:38px; height:38px; border-radius:11px;
+  background:{T['GRAD']}; display:flex; align-items:center;
+  justify-content:center; font-size:1.1rem; flex-shrink:0;
 }}
-.score-hero.ok  {{
-  background: {T['score_ok_bg']};
-  border: 1.5px solid {'rgba(52,211,153,.25)' if dm else 'rgba(5,150,105,.2)'};
+.sb-logo-text{{font-family:'Sora',sans-serif; font-size:1.1rem; font-weight:700; color:{T['TEXT']}}}
+.sb-logo-sub{{font-size:.58rem; color:{T['MUTED']}; letter-spacing:.1em; text-transform:uppercase}}
+.sb-prof{{
+  display:flex; align-items:center; gap:10px;
+  background:{T['ACTIVE']}; border:1px solid {T['BORDER']};
+  border-radius:13px; padding:.8rem .9rem; margin-bottom:1.3rem;
 }}
-.score-hero.mid {{
-  background: {T['score_mid_bg']};
-  border: 1.5px solid {'rgba(251,191,36,.25)' if dm else 'rgba(180,83,9,.2)'};
+.sb-av{{
+  width:40px; height:40px; border-radius:50%; flex-shrink:0;
+  background:{T['GRAD']}; display:flex; align-items:center;
+  justify-content:center; font-weight:800; font-size:1rem; color:#fff;
+  border:2px solid {T['ACCENT']};
 }}
-.score-hero.low {{
-  background: {T['score_low_bg']};
-  border: 1.5px solid {'rgba(251,113,133,.25)' if dm else 'rgba(225,29,72,.2)'};
+.sb-av img{{width:100%;height:100%;border-radius:50%;object-fit:cover}}
+.sb-pname{{font-size:.86rem; font-weight:700; color:{T['TEXT']}; line-height:1.2}}
+.sb-prole{{font-size:.62rem; color:{T['ACCENT']}; letter-spacing:.08em; text-transform:uppercase}}
+.sb-sec{{
+  font-size:.58rem; font-weight:700; color:{T['MUTED']};
+  letter-spacing:.18em; text-transform:uppercase;
+  padding:.3rem .4rem; margin-bottom:.35rem; margin-top:.5rem;
 }}
-.score-hero::before {{
-  content: '';
-  position: absolute;
-  top: -40%; left: -20%;
-  width: 120%; height: 100%;
-  background: radial-gradient(ellipse at center, currentColor 0%, transparent 65%);
-  opacity: {'0.04' if dm else '0.03'};
-  pointer-events: none;
+.sb-item{{
+  display:flex; align-items:center; gap:10px;
+  padding:.58rem .85rem; border-radius:11px; cursor:pointer;
+  transition:all .18s; color:{T['MUTED']}; font-size:.85rem;
+  font-weight:500; border:1px solid transparent; margin-bottom:.18rem;
 }}
-.score-number {{
-  font-family: 'Lora', serif;
-  font-size: 5.5rem;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -2px;
-  transition: transform .3s cubic-bezier(.22,1,.36,1);
+.sb-item:hover{{background:{T['ACTIVE']};color:{T['TEXT']};border-color:{T['BORDER']}}}
+.sb-item.on{{
+  background:{T['ACTIVE']}; color:{T['ACCENT']}; font-weight:700;
+  border-color:{'rgba(99,102,241,.28)' if DK else 'rgba(79,70,229,.2)'};
 }}
-.score-hero:hover .score-number {{ transform: scale(1.05); }}
-.score-number.ok  {{ color: {T['green']}; }}
-.score-number.mid {{ color: {T['yellow']}; }}
-.score-number.low {{ color: {T['red']}; }}
-.score-emoji {{
-  font-size: 2.2rem;
-  margin-bottom: .3rem;
-  display: inline-block;
-  transition: transform .3s cubic-bezier(.22,1,.36,1);
-}}
-.score-hero:hover .score-emoji {{ transform: scale(1.2) rotate(-5deg); }}
-.score-label {{
-  font-size: .68rem;
-  color: {T['muted']};
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  margin-top: .5rem;
-  font-weight: 600;
-}}
-.score-note {{
-  font-size: 1rem;
-  color: {T['text2']};
-  margin-top: .6rem;
-  font-weight: 500;
-}}
-.progress-track {{
-  background: {T['border2']};
-  border-radius: 99px;
-  height: 6px;
-  max-width: 300px;
-  margin: 1rem auto 0;
-  overflow: hidden;
-}}
-.progress-fill {{
-  height: 100%;
-  border-radius: 99px;
-  background: {T['btn_grad']};
-  transition: width 1s cubic-bezier(.22,1,.36,1);
-}}
-.grade-badge {{
-  display: inline-block;
-  font-family: 'Lora', serif;
-  font-size: 1.1rem;
-  font-weight: 700;
-  padding: .3rem 1.1rem;
-  border-radius: 99px;
-  margin-top: .8rem;
-  transition: transform .2s, box-shadow .2s;
-  cursor: default;
-}}
-.grade-badge:hover {{ transform: scale(1.08); box-shadow: 0 4px 16px {T['focus_ring']}; }}
-.grade-badge.ok  {{ color:{T['green']};  background:{'rgba(52,211,153,.15)' if dm else 'rgba(5,150,105,.1)'}; border:1px solid {'rgba(52,211,153,.3)' if dm else 'rgba(5,150,105,.3)'}; }}
-.grade-badge.mid {{ color:{T['yellow']}; background:{'rgba(251,191,36,.15)' if dm else 'rgba(180,83,9,.1)'}; border:1px solid {'rgba(251,191,36,.3)' if dm else 'rgba(180,83,9,.3)'}; }}
-.grade-badge.low {{ color:{T['red']};    background:{'rgba(251,113,133,.15)' if dm else 'rgba(225,29,72,.1)'}; border:1px solid {'rgba(251,113,133,.3)' if dm else 'rgba(225,29,72,.3)'}; }}
+.sb-icon{{font-size:1rem; width:20px; flex-shrink:0}}
+.sb-foot{{margin-top:auto; border-top:1px solid {T['BORDER']}; padding-top:.9rem}}
 
-/* ── Report box ── */
-.report-box {{
-  background: {T['bg3']};
-  border: 1px solid {T['border']};
-  border-radius: 16px;
-  padding: 1.4rem 1.6rem;
-}}
-.report-title {{
-  font-family: 'Lora', serif;
-  font-size: 1.15rem;
-  color: {T['text']};
-  margin-bottom: .12rem;
-}}
-.report-sub {{
-  font-size: .72rem;
-  color: {T['faint']};
-  margin-bottom: 1.1rem;
-  letter-spacing: .04em;
-}}
-.rrow {{
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: .52rem .6rem;
-  border-bottom: 1px solid {T['border']};
-  font-size: .84rem;
-  border-radius: 8px;
-  transition: background .18s, padding-left .18s;
-  cursor: default;
-}}
-.rrow:hover {{
-  background: {T['tag_bg']};
-  padding-left: 1rem;
-}}
-.rrow:last-child {{ border-bottom: none; }}
-.rkey {{ color: {T['muted']}; font-weight: 500; transition: color .18s; }}
-.rrow:hover .rkey {{ color: {T['accent']}; }}
-.rval {{ font-weight: 700; color: {T['text']}; }}
+/* ━━━━━━━━━━━━ PAGE HEADER ━━━━━━━━━━━━ */
+.pg-hdr{{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.8rem;flex-wrap:wrap;gap:.8rem}}
+.pg-title{{font-family:'Sora',sans-serif;font-size:1.65rem;font-weight:800;color:{T['TEXT']};letter-spacing:-.5px}}
+.pg-sub{{font-size:.8rem;color:{T['MUTED']};margin-top:3px}}
 
-/* ── Suggestions ── */
-.sug {{
-  display: flex;
-  align-items: flex-start;
-  gap: .8rem;
-  background: {T['bg3']};
-  border: 1px solid {T['border']};
-  border-left: 3px solid {T['accent']};
-  border-radius: 14px;
-  padding: 1rem 1.1rem;
-  margin-bottom: .55rem;
-  transition: border-color .25s, transform .25s cubic-bezier(.22,1,.36,1),
-              background .25s, box-shadow .25s;
-  cursor: default;
+/* ━━━━━━━━━━━━ STAT CARDS ━━━━━━━━━━━━ */
+.stat{{
+  background:{T['CARD']}; border:1px solid {T['BORDER']};
+  border-radius:18px; padding:1.3rem 1.4rem; box-shadow:{T['SHADOW2']};
+  position:relative; overflow:hidden;
 }}
-.sug:hover {{
-  border-left-color: {T['accent2']};
-  border-color: {T['accent2']};
-  transform: translateX(5px);
-  background: {'rgba(52,211,153,0.05)' if dm else 'rgba(5,150,105,0.04)'};
-  box-shadow: 0 4px 20px {'rgba(52,211,153,0.12)' if dm else 'rgba(5,150,105,0.1)'};
+.stat-ico{{
+  width:40px;height:40px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;margin-bottom:.6rem;
 }}
-.sug:hover .sug-icon {{ transform: scale(1.25) rotate(-5deg); }}
-.sug-icon {{
-  font-size: 1.3rem;
-  flex-shrink: 0;
-  transition: transform .25s cubic-bezier(.22,1,.36,1);
-  display: inline-block;
+.stat-v{{
+  font-family:'Sora',sans-serif; font-size:2rem; font-weight:800;
+  color:{T['TEXT']}; line-height:1; margin-bottom:.2rem;
 }}
-.sug-body {{ font-size: .84rem; color: {T['text2']}; line-height: 1.6; }}
-.sug-title {{ font-weight: 700; color: {T['text']}; margin-bottom: 3px; font-size: .88rem; transition: color .2s; }}
-.sug:hover .sug-title {{ color: {T['accent2']}; }}
+.stat-l{{font-size:.74rem;color:{T['MUTED']};font-weight:500;letter-spacing:.02em}}
+.stat-badge{{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:.68rem;font-weight:700;padding:.15rem .5rem;
+  border-radius:99px;margin-top:.35rem;
+}}
+.up  {{background:{'rgba(16,185,129,.12)' if DK else 'rgba(5,150,105,.09)'};color:{T['GREEN']}}}
+.mid {{background:{'rgba(245,158,11,.12)' if DK else 'rgba(217,119,6,.09)'};color:{T['YELLOW']}}}
+.dn  {{background:{'rgba(239,68,68,.12)' if DK else 'rgba(220,38,38,.09)'};color:{T['RED']}}}
 
-/* ── Metrics ── */
-[data-testid="stMetric"] {{
-  background: {T['bg3']} !important;
-  border: 1px solid {T['border']} !important;
-  border-radius: 14px !important;
-  padding: .8rem 1rem !important;
-  transition: transform .25s cubic-bezier(.22,1,.36,1),
-              border-color .25s,
-              box-shadow .25s !important;
-  cursor: default;
+/* ━━━━━━━━━━━━ SCORE HERO ━━━━━━━━━━━━ */
+.score-hero{{
+  border-radius:22px; padding:2.4rem 2rem 2rem;
+  text-align:center; animation:fadeUp .5s ease; position:relative; overflow:hidden;
 }}
-[data-testid="stMetric"]:hover {{
-  transform: translateY(-4px) !important;
-  border-color: {T['accent']} !important;
-  box-shadow: 0 8px 28px {T['focus_ring']} !important;
+.sh-ok  {{background:{'linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04))' if DK else 'linear-gradient(135deg,rgba(5,150,105,.07),rgba(5,150,105,.02))'};border:1.5px solid {'rgba(16,185,129,.3)' if DK else 'rgba(5,150,105,.2)'}}}
+.sh-mid {{background:{'linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.04))' if DK else 'linear-gradient(135deg,rgba(217,119,6,.07),rgba(217,119,6,.02))'};border:1.5px solid {'rgba(245,158,11,.3)' if DK else 'rgba(217,119,6,.2)'}}}
+.sh-low {{background:{'linear-gradient(135deg,rgba(239,68,68,.12),rgba(239,68,68,.04))' if DK else 'linear-gradient(135deg,rgba(220,38,38,.07),rgba(220,38,38,.02))'};border:1.5px solid {'rgba(239,68,68,.3)' if DK else 'rgba(220,38,38,.2)'}}}
+.sh-num{{
+  font-family:'Sora',sans-serif; font-size:6rem; font-weight:800;
+  line-height:1; letter-spacing:-4px;
 }}
-[data-testid="stMetricValue"] {{
-  color: {T['accent']} !important;
-  font-size: 1.4rem !important;
-  font-weight: 700 !important;
-  transition: color .2s !important;
+.sh-ok  .sh-num{{color:{T['GREEN']}}}
+.sh-mid .sh-num{{color:{T['YELLOW']}}}
+.sh-low .sh-num{{color:{T['RED']}}}
+.sh-label{{font-size:.7rem;color:{T['MUTED']};letter-spacing:.16em;text-transform:uppercase;margin-top:.4rem}}
+.sh-note{{font-size:.95rem;color:{T['TEXT2']};margin-top:.5rem;font-weight:500}}
+.sh-bar{{background:{T['FAINT']};border-radius:99px;height:7px;max-width:260px;margin:.9rem auto 0;overflow:hidden}}
+.sh-prog{{height:100%;border-radius:99px}}
+
+/* ━━━━━━━━━━━━ REPORT TABLE ━━━━━━━━━━━━ */
+.rtbl{{border-radius:14px;overflow:hidden;border:1px solid {T['BORDER']}}}
+.rr{{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:.54rem 1.1rem;font-size:.83rem;
+  border-bottom:1px solid {T['BORDER']};
 }}
-[data-testid="stMetric"]:hover [data-testid="stMetricValue"] {{
-  color: {T['accent2']} !important;
+.rr:last-child{{border-bottom:none}}
+.rr:nth-child(odd){{background:{T['CARD2']}}}
+.rr:nth-child(even){{background:{T['CARD']}}}
+.rk{{color:{T['MUTED']};font-size:.76rem}}
+.rv{{font-weight:700;color:{T['TEXT']}}}
+
+/* ━━━━━━━━━━━━ BADGES ━━━━━━━━━━━━ */
+.badge{{display:inline-flex;align-items:center;border-radius:99px;padding:.18rem .78rem;font-size:.7rem;font-weight:800;letter-spacing:.03em}}
+.b-ok {{background:{'rgba(16,185,129,.15)' if DK else 'rgba(5,150,105,.1)'};color:{T['GREEN']};border:1px solid {'rgba(16,185,129,.35)' if DK else 'rgba(5,150,105,.3)'}}}
+.b-mid{{background:{'rgba(245,158,11,.15)' if DK else 'rgba(217,119,6,.1)'};color:{T['YELLOW']};border:1px solid {'rgba(245,158,11,.35)' if DK else 'rgba(217,119,6,.3)'}}}
+.b-low{{background:{'rgba(239,68,68,.15)' if DK else 'rgba(220,38,38,.1)'};color:{T['RED']};border:1px solid {'rgba(239,68,68,.35)' if DK else 'rgba(220,38,38,.3)'}}}
+
+/* ━━━━━━━━━━━━ SUGGESTIONS ━━━━━━━━━━━━ */
+.sug{{
+  display:flex;gap:.8rem;align-items:flex-start;
+  background:{T['CARD2']};border:1px solid {T['BORDER']};
+  border-radius:14px;padding:.95rem 1.1rem;margin-bottom:.5rem;
+  transition:border-color .18s;
 }}
-[data-testid="stMetricLabel"] {{
-  color: {T['muted']} !important;
-  font-size: .72rem !important;
-  font-weight: 600 !important;
-  letter-spacing: .04em !important;
+.sug:hover{{border-color:{T['ACCENT']}}}
+.sug-ico{{
+  width:38px;height:38px;flex-shrink:0;border-radius:11px;
+  background:{T['TAG']};display:flex;align-items:center;
+  justify-content:center;font-size:1.15rem;
+}}
+.sug-t{{font-weight:700;font-size:.87rem;color:{T['TEXT']};margin-bottom:2px}}
+.sug-b{{font-size:.82rem;color:{T['TEXT2']};line-height:1.55}}
+
+/* ━━━━━━━━━━━━ OTP BOX ━━━━━━━━━━━━ */
+.otp-info{{
+  background:{T['TAG']};border:1px solid {'rgba(99,102,241,.25)' if DK else 'rgba(79,70,229,.2)'};
+  border-radius:12px;padding:.8rem 1rem;font-size:.82rem;
+  color:{T['ACCENT']};text-align:center;margin-bottom:.8rem;
 }}
 
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] {{
-  background: {T['nav_bg']} !important;
-  border-right: 1px solid {T['border']} !important;
+/* ━━━━━━━━━━━━ WA BUTTON ━━━━━━━━━━━━ */
+.wa-btn{{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  background:#25D366;color:#fff;border-radius:12px;
+  padding:.7rem 1.4rem;font-weight:700;font-size:.88rem;
+  text-decoration:none;width:100%;cursor:pointer;
+  transition:all .22s;box-shadow:0 4px 16px rgba(37,211,102,.3);
+  font-family:'Plus Jakarta Sans',sans-serif;
 }}
-.sb-avatar {{
-  width: 48px; height: 48px;
-  border-radius: 14px;
-  background: {T['btn_grad']};
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.3rem; font-weight: 800;
-  color: white;
-  margin-bottom: .55rem;
-  box-shadow: {T['btn_shadow']};
-  transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s;
-  cursor: default;
-}}
-.sb-avatar:hover {{
-  transform: scale(1.12) rotate(-4deg);
-  box-shadow: 0 8px 28px {'rgba(99,102,241,0.5)' if dm else 'rgba(67,56,202,0.4)'};
-}}
-.sb-name {{ font-family: 'Lora', serif; font-size: 1rem; color: {T['text']}; font-weight: 600; }}
-.sb-role {{
-  font-size: .65rem; color: {T['accent']};
-  letter-spacing: .14em; text-transform: uppercase;
-  margin-top: 2px; font-weight: 700;
-}}
-.sb-info {{ font-size: .74rem; color: {T['muted']}; margin-top: 6px; line-height: 1.7; }}
+.wa-btn:hover{{background:#1db954;transform:translateY(-2px);box-shadow:0 8px 22px rgba(37,211,102,.42)}}
 
-/* ── Alerts ── */
-.stAlert {{ border-radius: 14px !important; }}
+/* ━━━━━━━━━━━━ HISTORY BADGE ━━━━━━━━━━━━ */
+.hist-item{{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:.55rem .9rem;border-radius:10px;margin-bottom:.3rem;
+  background:{T['CARD2']};border:1px solid {T['BORDER']};font-size:.82rem;
+}}
+.hist-date{{color:{T['MUTED']};font-size:.74rem}}
 
-/* ── Animations ── */
-@keyframes fadeUp {{
-  from {{ opacity: 0; transform: translateY(16px); }}
-  to   {{ opacity: 1; transform: translateY(0); }}
+/* ━━━━━━━━━━━━ ANIMATION ━━━━━━━━━━━━ */
+@keyframes fadeUp{{
+  from{{opacity:0;transform:translateY(14px)}}
+  to{{opacity:1;transform:translateY(0)}}
 }}
-@keyframes pulse {{
-  0%, 100% {{ opacity: 1; }}
-  50%       {{ opacity: .6; }}
-}}
-@keyframes shimmer {{
-  0%   {{ background-position: -200% center; }}
-  100% {{ background-position:  200% center; }}
-}}
-@keyframes bounceIn {{
-  0%   {{ transform: scale(0.85); opacity: 0; }}
-  60%  {{ transform: scale(1.04); opacity: 1; }}
-  100% {{ transform: scale(1); }}
-}}
-.fade {{ animation: fadeUp .45s cubic-bezier(.22,1,.36,1); }}
+.fade{{animation:fadeUp .4s ease}}
 
-/* ── Factor bar ── */
-.factor-row {{
-  display: flex; align-items: center; gap: .8rem;
-  margin-bottom: .7rem; font-size: .82rem;
-  padding: .35rem .5rem;
-  border-radius: 10px;
-  transition: background .2s, transform .2s cubic-bezier(.22,1,.36,1);
-  cursor: default;
-}}
-.factor-row:hover {{
-  background: {T['tag_bg']};
-  transform: translateX(4px);
-}}
-.factor-row:hover .factor-name {{ color: {T['accent']}; }}
-.factor-row:hover .factor-track {{ box-shadow: 0 0 8px {T['focus_ring']}; }}
-.factor-name {{
-  width: 120px; color: {T['muted']}; font-weight: 600; flex-shrink: 0;
-  transition: color .2s;
-}}
-.factor-track {{
-  flex: 1; height: 8px; background: {T['border2']};
-  border-radius: 99px; overflow: hidden;
-  transition: box-shadow .2s;
-}}
-.factor-fill {{ height: 100%; border-radius: 99px; transition: filter .2s; }}
-.factor-row:hover .factor-fill {{ filter: brightness(1.18); }}
-.factor-val {{
-  width: 36px; text-align: right; font-weight: 700;
-  color: {T['text']}; font-size: .8rem;
-  transition: color .2s;
-}}
-.factor-row:hover .factor-val {{ color: {T['accent']}; }}
-
-/* ── Form center ── */
-.form-center {{ max-width: 480px; margin: 0 auto; }}
-
-/* ── Stat chip ── */
-.stat-chip {{
-  display: inline-flex; align-items: center; gap: .4rem;
-  background: {T['tag_bg']}; border: 1px solid {T['border']};
-  border-radius: 99px; padding: .35rem .9rem;
-  font-size: .78rem; color: {T['accent']}; font-weight: 600;
-  transition: transform .2s, box-shadow .2s;
-}}
-.stat-chip:hover {{
-  transform: scale(1.06);
-  box-shadow: 0 4px 14px {T['focus_ring']};
-}}
+/* ━━━━━━━━━━━━ MAIN WRAP ━━━━━━━━━━━━ */
+.main{{padding:2rem 2.4rem 4rem}}
 </style>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════
+
+# ──────────────────────────────────────────────────────────────
 # HELPERS
-# ══════════════════════════════════════════════════════════
+# ──────────────────────────────────────────────────────────────
 def hp(p): return hashlib.sha256(p.encode()).hexdigest()
 
 def load_users():
     if not os.path.exists("users.json"):
         d = {
             "student1": dict(password=hp("student123"), role="Student",
-                             name="Demo Student", dob="2008-06-15", cls="10"),
-            "parent1":  dict(password=hp("parent123"),  role="Parent",
-                             name="Demo Parent",  dob="1980-03-20", cls="",
+                             name="Demo Student", dob="2008-06-15", cls="10",
+                             phone="", avatar="", history=[]),
+            "parent1":  dict(password=hp("parent123"), role="Parent",
+                             name="Demo Parent", dob="1980-03-20", cls="",
+                             phone="", avatar="", history=[],
                              child_name="Demo Child", child_dob="2010-01-10", child_cls="7"),
         }
         save_users(d); return d
@@ -691,860 +465,872 @@ def load_users():
 def save_users(u):
     with open("users.json","w") as f: json.dump(u, f, indent=4)
 
-def calc_age(dob_str):
+def calc_age(s):
     try:
-        dob = datetime.strptime(dob_str, "%Y-%m-%d").date()
-        td  = date.today()
-        return td.year - dob.year - ((td.month, td.day) < (dob.month, dob.day))
+        d = datetime.strptime(s,"%Y-%m-%d").date(); t = date.today()
+        return t.year-d.year-((t.month,t.day)<(d.month,d.day))
     except: return "—"
 
 @st.cache_resource
 def load_model():
     return joblib.load("student_model.pkl"), joblib.load("model_columns.pkl")
 
-def sec(label): st.markdown(f'<p class="sec-label">{label}</p>', unsafe_allow_html=True)
-def hdiv():     st.markdown('<hr class="hdiv">', unsafe_allow_html=True)
+def sec(l): st.markdown(f'<div class="sec-lbl">{l}</div>', unsafe_allow_html=True)
+def hdiv(): st.markdown('<hr class="hdiv">', unsafe_allow_html=True)
+def co():   st.markdown('<div class="card fade">', unsafe_allow_html=True)
+def cc():   st.markdown('</div>', unsafe_allow_html=True)
 
-def theme_toggle(key="t"):
-    _, c2 = st.columns([9, 1])
-    with c2:
-        lbl = "☀️" if dm else "🌙"
-        if st.button(lbl, key=key, help="Toggle theme"):
-            st.session_state.dark = not st.session_state.dark; st.rerun()
+def avatar_html(user, sz=42):
+    if user.get("avatar"):
+        return f'<div class="sb-av" style="width:{sz}px;height:{sz}px"><img src="{user["avatar"]}"/></div>'
+    init = (user.get("name","?")[0] or "?").upper()
+    fs   = sz*0.38
+    return f'<div class="sb-av" style="width:{sz}px;height:{sz}px;font-size:{fs:.0f}px">{init}</div>'
 
-def factor_bar(name, val, color):
-    bar_color = color
-    st.markdown(f"""
-    <div class="factor-row">
-      <div class="factor-name">{name}</div>
-      <div class="factor-track">
-        <div class="factor-fill" style="width:{val}%;background:{bar_color};"></div>
-      </div>
-      <div class="factor-val">{val}%</div>
-    </div>""", unsafe_allow_html=True)
+def grade_cls(s):
+    if   s>=75: return "ok",  "🏆","Outstanding performance!", T["GREEN"], "A"
+    elif s>=60: return "mid", "📈","Good — keep pushing!",     T["YELLOW"],"B"
+    elif s>=45: return "mid", "📘","Average — more effort.",   T["YELLOW"],"C"
+    else:       return "low", "📚","Needs significant work.",  T["RED"],   "D"
 
-def score_color(v):
-    if v >= 75: return T['green']
-    if v >= 50: return T['yellow']
-    return T['red']
+CLS_OPTS = ["1","2","3","4","5","6","7","8","9","10","11","12","College","Other"]
 
-# ══════════════════════════════════════════════════════════
-# PREMIUM PDF BUILDER
-# ══════════════════════════════════════════════════════════
+# OTP simulation (in real app, send SMS via Twilio)
+def gen_otp():  return str(random.randint(100000,999999))
+
+
+# ──────────────────────────────────────────────────────────────
+# PDF BUILDER  (reportlab, no matplotlib)
+# ──────────────────────────────────────────────────────────────
+def hex_rl(h):
+    h=h.lstrip("#")
+    return colors.Color(*[int(h[i:i+2],16)/255 for i in (0,2,4)])
+
 def build_pdf(r):
-    dark = r["dark"]
-    # Color palette
-    bg      = "#07080f" if dark else "#f8f9ff"
-    bg2     = "#0f1420" if dark else "#ffffff"
-    fg      = "#eef2ff" if dark else "#0f1135"
-    muted   = "#5c6b8a" if dark else "#7480a8"
-    border  = "#1c2538" if dark else "#e2e5f5"
-    accent  = "#818cf8" if dark else "#5b5ef4"
-    accent2 = "#34d399" if dark else "#059669"
-    pink    = "#f472b6" if dark else "#db2777"
-
-    g = r["grade"]
-    if g == "A":
-        gcol = accent2; gcol_light = ("rgba(52,211,153,.15)" if dark else "rgba(5,150,105,.08)")
-    elif g in ("B","C"):
-        gcol = "#fbbf24"; gcol_light = ("rgba(251,191,36,.15)" if dark else "rgba(180,83,9,.08)")
-    else:
-        gcol = "#fb7185" if dark else "#e11d48"; gcol_light = ("rgba(251,113,133,.15)" if dark else "rgba(225,29,72,.08)")
-
     buf = io.BytesIO()
+    W,H = A4
 
-    plt.rcParams.update({
-        'font.family': 'DejaVu Sans',
-        'axes.spines.top': False,
-        'axes.spines.right': False,
-    })
+    BG   =hex_rl("#080c14"); CARD =hex_rl("#111827"); CARD2=hex_rl("#161f30")
+    ACC  =hex_rl("#6366f1"); ACC2 =hex_rl("#06b6d4"); BRD  =hex_rl("#1e2d45")
+    TXT  =hex_rl("#edf2ff"); MUT  =hex_rl("#4d6080"); WHT  =colors.white
 
-    with PdfPages(buf) as pdf:
+    if   r["grade"]=="A": GC=hex_rl("#10b981")
+    elif r["grade"]<="C": GC=hex_rl("#f59e0b")
+    else:                 GC=hex_rl("#ef4444")
 
-        # ═══════════════════════════════════════════
-        # PAGE 1 — HERO + CHARTS
-        # ═══════════════════════════════════════════
-        fig = plt.figure(figsize=(8.27, 11.69), facecolor=bg)
+    def S(n,**k): return ParagraphStyle(n,**k)
+    Tt = S("Tt",fontName="Helvetica-Bold",fontSize=22,textColor=ACC,alignment=TA_CENTER,spaceAfter=3)
+    Ts = S("Ts",fontName="Helvetica",fontSize=8.5,textColor=MUT,alignment=TA_CENTER,spaceAfter=3)
+    Th = S("Th",fontName="Helvetica-Bold",fontSize=10,textColor=ACC,spaceBefore=8,spaceAfter=4)
+    Tb = S("Tb",fontName="Helvetica",fontSize=8.5,textColor=TXT,leading=13)
+    Tm = S("Tm",fontName="Helvetica",fontSize=8,textColor=MUT,leading=12)
+    Tf = S("Tf",fontName="Helvetica",fontSize=7.5,textColor=MUT,alignment=TA_CENTER)
 
-        # ── Header stripe ──
-        ax_hdr = fig.add_axes([0, 0.93, 1, 0.07])
-        ax_hdr.set_facecolor(bg2)
-        ax_hdr.set_xticks([]); ax_hdr.set_yticks([])
-        for sp in ax_hdr.spines.values(): sp.set_visible(False)
-        # Gradient accent line at top
-        grad = np.linspace(0, 1, 300).reshape(1, -1)
-        ax_hdr.imshow(grad, aspect='auto', extent=[0,1,0,1],
-                      cmap=matplotlib.colors.LinearSegmentedColormap.from_list('g', [accent, accent2, pink]),
-                      alpha=0.9, transform=ax_hdr.transAxes)
-        ax_hdr.set_ylim(0,1); ax_hdr.set_xlim(0,1)
+    def bg(canvas,doc):
+        canvas.saveState()
+        canvas.setFillColor(BG)
+        canvas.rect(0,0,W,H,fill=1,stroke=0)
+        canvas.restoreState()
 
-        fig.text(0.5, 0.965, "ScoreIQ", ha="center",
-                 fontsize=28, fontweight="bold", color=accent,
-                 fontfamily="serif")
-        fig.text(0.5, 0.946, "Academic Performance Report", ha="center",
-                 fontsize=10, color=muted, fontstyle="italic")
+    # ── Chart 1: horizontal factor bars ──────────────────────
+    def chart_factors():
+        ks=list(r["factor_scores"].keys()); vs=list(r["factor_scores"].values())
+        dw,dh=460,210; d=Drawing(dw,dh)
+        d.add(Rect(0,0,dw,dh,fillColor=CARD,strokeColor=None))
+        bh=17; gap=7; xs=118; xw=dw-xs-24
+        for i,(k,v) in enumerate(zip(ks,vs)):
+            y=dh-28-i*(bh+gap)
+            d.add(String(xs-5,y+5,k,fontName="Helvetica",fontSize=7.5,fillColor=MUT,textAnchor="end"))
+            d.add(Rect(xs,y,xw,bh,fillColor=hex_rl("#263650"),strokeColor=None))
+            fw=max(3,int(v/110*xw))
+            bc=GC if v>=70 else (ACC if v>=45 else hex_rl("#ef4444"))
+            d.add(Rect(xs,y,fw,bh,fillColor=bc,strokeColor=None))
+            d.add(String(xs+fw+4,y+5,f"{v}%",fontName="Helvetica-Bold",fontSize=7,fillColor=TXT))
+        return d
 
-        # ── Info bar ──
-        ax_info = fig.add_axes([0.06, 0.875, 0.88, 0.058])
-        ax_info.set_facecolor(bg2)
-        for sp in ax_info.spines.values(): sp.set_color(border); sp.set_linewidth(0.6)
-        ax_info.set_xticks([]); ax_info.set_yticks([])
-        info_items = [
-            f"👤  {r['sname']}",
-            f"🏫  Class {r['student_class']}",
-            f"📅  {r['today']}",
-            f"🎂  Age {r['age_disp']}",
-        ]
-        for i, txt in enumerate(info_items):
-            ax_info.text(0.02 + i * 0.25, 0.5, txt,
-                         transform=ax_info.transAxes, fontsize=8.5,
-                         color=fg, va="center", fontweight="500")
+    # ── Chart 2: score comparison vertical bars ───────────────
+    def chart_compare():
+        dw,dh=210,155; d=Drawing(dw,dh)
+        d.add(Rect(0,0,dw,dh,fillColor=CARD,strokeColor=None))
+        data=[int(r["previous"]),r["final_score"]]; labs=["Previous","Predicted"]
+        bw=46; gap=38; x0=28
+        for i,(l,v) in enumerate(zip(labs,data)):
+            x=x0+i*(bw+gap); h=max(4,int(v/110*110))
+            c=MUT if i==0 else GC
+            d.add(Rect(x,22,bw,h,fillColor=c,strokeColor=None))
+            d.add(String(x+bw/2,22+h+5,str(v),fontName="Helvetica-Bold",fontSize=9,fillColor=TXT,textAnchor="middle"))
+            d.add(String(x+bw/2,7,l,fontName="Helvetica",fontSize=7.5,fillColor=MUT,textAnchor="middle"))
+        return d
 
-        # ── Score hero panel ──
-        ax_score = fig.add_axes([0.06, 0.775, 0.88, 0.092])
-        ax_score.set_facecolor(bg2)
-        for sp in ax_score.spines.values(): sp.set_color(gcol); sp.set_linewidth(1)
-        ax_score.set_xticks([]); ax_score.set_yticks([])
+    # ── Chart 3: donut hours ──────────────────────────────────
+    def chart_donut():
+        sh=float(r["hours"]); sl=float(r["sleep"]); ot=max(0.0,24-sh-sl)
+        dw,dh=210,155; d=Drawing(dw,dh)
+        d.add(Rect(0,0,dw,dh,fillColor=CARD,strokeColor=None))
+        pie=Pie(); pie.x=50; pie.y=18; pie.width=pie.height=105
+        pie.data=[sh,sl,ot]
+        pie.slices[0].fillColor=ACC; pie.slices[1].fillColor=GC; pie.slices[2].fillColor=hex_rl("#263650")
+        pie.slices.strokeColor=BG; pie.slices.strokeWidth=1.5
+        pie.innerRadiusFraction=0.46; pie.sideLabels=0; pie.labels=None
+        d.add(pie)
+        items=[("Study",ACC,sh),("Sleep",GC,sl),("Other",hex_rl("#263650"),ot)]
+        for i,(lb,c,v) in enumerate(items):
+            y=dh-28-i*18
+            d.add(Rect(160,y,11,11,fillColor=c,strokeColor=None))
+            d.add(String(175,y+2,f"{lb}  {v:.1f}h",fontName="Helvetica",fontSize=7.5,fillColor=MUT))
+        return d
 
-        # Big score
-        ax_score.text(0.18, 0.55, f"{r['final_score']}", transform=ax_score.transAxes,
-                      fontsize=40, fontweight="bold", color=gcol, va="center", ha="center",
-                      fontfamily="serif")
-        ax_score.text(0.18, 0.12, "/ 100", transform=ax_score.transAxes,
-                      fontsize=9, color=muted, va="center", ha="center")
+    # ── Chart 4: grade gauge ──────────────────────────────────
+    def chart_gauge():
+        fs=r["final_score"]
+        dw,dh=165,135; d=Drawing(dw,dh)
+        d.add(Rect(0,0,dw,dh,fillColor=CARD,strokeColor=None))
+        pie=Pie(); pie.x=28; pie.y=18; pie.width=pie.height=95
+        pie.data=[fs,100-fs]
+        pie.slices[0].fillColor=GC; pie.slices[1].fillColor=hex_rl("#263650")
+        pie.slices.strokeColor=BG; pie.slices.strokeWidth=2
+        pie.innerRadiusFraction=0.52; pie.sideLabels=0; pie.labels=None
+        d.add(pie)
+        d.add(String(dw*0.45,dh*0.48,str(fs),fontName="Helvetica-Bold",fontSize=20,fillColor=GC,textAnchor="middle"))
+        d.add(String(dw*0.45,dh*0.48-16,"/100",fontName="Helvetica",fontSize=8,fillColor=MUT,textAnchor="middle"))
+        return d
 
-        # Vertical divider
-        ax_score.axvline(0.36, color=border, linewidth=1)
+    doc = SimpleDocTemplate(buf,pagesize=A4,
+                            leftMargin=1.4*cm,rightMargin=1.4*cm,
+                            topMargin=1.2*cm,bottomMargin=1.2*cm)
+    story=[]
 
-        # Grade badge area
-        ax_score.text(0.50, 0.72, f"Grade {g}", transform=ax_score.transAxes,
-                      fontsize=18, fontweight="bold", color=gcol, va="center", ha="center",
-                      fontfamily="serif")
-        ax_score.text(0.50, 0.32, r['remark'], transform=ax_score.transAxes,
-                      fontsize=9, color=muted, va="center", ha="center")
+    # ── Page 1 ────────────────────────────────────────────────
+    story.append(Paragraph("ScoreIQ",Tt))
+    story.append(Paragraph("Academic Performance Report",Ts))
+    story.append(Paragraph(f"Generated: {r['today']}  ·  Student: {r['sname']}  ·  Class {r['student_class']}",Ts))
+    story.append(Spacer(1,8))
 
-        # Progress bar in score hero
-        ax_score.axvline(0.72, color=border, linewidth=1)
-        ax_score.text(0.84, 0.82, "Score Progress", transform=ax_score.transAxes,
-                      fontsize=7.5, color=muted, va="center", ha="center", fontweight="600")
-        # bar track
-        bar_x = 0.74; bar_w = 0.20; bar_y = 0.38; bar_h = 0.22
-        ax_score.add_patch(mpatches.FancyBboxPatch((bar_x, bar_y), bar_w, bar_h,
-            boxstyle="round,pad=0.01", facecolor=border, transform=ax_score.transAxes, zorder=3))
-        fill_w = bar_w * r['final_score'] / 100
-        ax_score.add_patch(mpatches.FancyBboxPatch((bar_x, bar_y), fill_w, bar_h,
-            boxstyle="round,pad=0.01", facecolor=gcol, transform=ax_score.transAxes, zorder=4))
-        ax_score.text(bar_x + bar_w/2, 0.25, f"{r['final_score']}%",
-                      transform=ax_score.transAxes, fontsize=8, color=fg,
-                      ha="center", va="center", fontweight="700")
+    # Score summary row
+    sc=Paragraph(
+        f'<font size="20"><b>{r["emoji"]}  {r["final_score"]} / 100</b></font><br/>'
+        f'<font color="#4d6080" size="9">Grade {r["grade"]}  —  {r["remark"]}</font>',
+        S("sp",fontName="Helvetica-Bold",fontSize=20,textColor=GC,alignment=TA_CENTER,leading=28))
+    t0=Table([[sc,chart_gauge()]],colWidths=[315,165])
+    t0.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),CARD),("BOX",(0,0),(-1,-1),.5,BRD),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("TOPPADDING",(0,0),(-1,-1),12),("BOTTOMPADDING",(0,0),(-1,-1),12),
+        ("LEFTPADDING",(0,0),(-1,-1),14),
+    ]))
+    story.append(t0); story.append(Spacer(1,10))
 
-        # ── Chart 1: Factor Strength (horizontal bars with gradient effect) ──
-        factors = list(r["factor_scores"].keys())
-        vals1   = list(r["factor_scores"].values())
-        cols1   = [gcol if v >= 70 else (accent if v >= 45 else "#fb7185") for v in vals1]
+    # Chart 1
+    story.append(Paragraph("Chart 1 — Factor Strength Analysis",Th))
+    story.append(chart_factors()); story.append(Spacer(1,10))
 
-        ax1 = fig.add_axes([0.06, 0.50, 0.88, 0.265])
-        ax1.set_facecolor(bg2)
-        for sp in ax1.spines.values(): sp.set_color(border); sp.set_linewidth(0.5)
-        ax1.tick_params(colors=muted, labelsize=8)
-        ax1.set_xlim(0, 115)
-        ax1.set_xlabel("Score (%)", color=muted, fontsize=8)
-        ax1.xaxis.label.set_color(muted)
-        ax1.tick_params(axis='x', colors=muted)
-        ax1.tick_params(axis='y', colors=fg)
+    # Charts 2+3
+    story.append(Paragraph("Chart 2 — Score Comparison                                     Chart 3 — Daily Hours Split",Th))
+    row=Table([[chart_compare(),chart_donut()]],colWidths=[230,230])
+    row.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),
+                              ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0)]))
+    story.append(row); story.append(Spacer(1,10))
 
-        bars = ax1.barh(factors, vals1, color=cols1, height=0.62,
-                        edgecolor="none", zorder=3)
-        # Light track behind bars
-        ax1.barh(factors, [100]*len(factors), color=border, height=0.62,
-                 edgecolor="none", zorder=2, alpha=0.4)
-        ax1.set_axisbelow(True)
-        ax1.grid(axis='x', color=border, linewidth=0.5, alpha=0.5, zorder=1)
+    # Input detail table
+    story.append(Paragraph("Input Details",Th))
+    def c(t,bold=False):
+        return Paragraph(t,S("c",fontName="Helvetica-Bold" if bold else "Helvetica",
+                              fontSize=8.5,textColor=TXT if bold else MUT))
+    det=[
+        [c("Study Hours"),c(f"{r['hours']} h/day",True),c("Attendance"),c(f"{int(r['attendance'])}%",True)],
+        [c("Previous Score"),c(f"{int(r['previous'])}/100",True),c("Predicted"),c(f"{r['final_score']}/100",True)],
+        [c("Sleep Hours"),c(f"{r['sleep']} h/day",True),c("Motivation"),c(r["motivation"],True)],
+        [c("Peer Influence"),c(r["peer"],True),c("Teacher Quality"),c(r["teacher"],True)],
+        [c("School Type"),c(r["school"],True),c("Internet Access"),c(r["internet"],True)],
+        [c("Parental Inv."),c(r["parent_inv"],True),c("Learning Res."),c(r["resources"],True)],
+        [c("Extracurricular"),c(r["activities"],True),c("Overall Grade"),c(r["grade"],True)],
+    ]
+    dt=Table(det,colWidths=[100,100,100,100])
+    dt.setStyle(TableStyle([
+        ("ROWBACKGROUNDS",(0,0),(-1,-1),[CARD,CARD2]),
+        ("BOX",(0,0),(-1,-1),.4,BRD),("INNERGRID",(0,0),(-1,-1),.3,BRD),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING",(0,0),(-1,-1),7),
+    ]))
+    story.append(dt)
 
-        for bar, val in zip(bars, vals1):
-            ax1.text(val + 1.5, bar.get_y() + bar.get_height()/2,
-                     f"{val}%", va="center", fontsize=7.5, color=fg, fontweight="600")
+    # ── Page 2: Suggestions ───────────────────────────────────
+    story.append(PageBreak())
+    story.append(Paragraph("Personalised Suggestions",Tt))
+    story.append(Paragraph(f"Student: {r['sname']}  ·  Score: {r['final_score']}/100  ·  Grade {r['grade']}",Ts))
+    story.append(Spacer(1,14))
+    for _,title,body in r["tips"]:
+        td=[[Paragraph(f"<b>{title}</b>",S("tt2",fontName="Helvetica-Bold",fontSize=9.5,textColor=ACC)),
+             Paragraph(body,Tm)]]
+        tt=Table(td,colWidths=[115,355])
+        tt.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,-1),CARD),("BOX",(0,0),(-1,-1),.4,BRD),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),10),
+        ]))
+        story.append(tt); story.append(Spacer(1,5))
+    story.append(Spacer(1,20))
+    story.append(Paragraph("Generated by ScoreIQ  ·  AI-powered academic score predictor",Tf))
 
-        ax1.set_title("① Factor Strength Analysis", color=fg, fontsize=10,
-                      pad=8, fontweight="bold", loc="left")
-
-        # ── Chart 2: Score comparison (grouped bars) ──
-        ax2 = fig.add_axes([0.06, 0.285, 0.42, 0.185])
-        ax2.set_facecolor(bg2)
-        for sp in ax2.spines.values(): sp.set_color(border); sp.set_linewidth(0.5)
-        x_pos = [0, 0.8]
-        vals2 = [int(r["previous"]), r["final_score"]]
-        cols2 = [muted, gcol]
-        bars2 = ax2.bar(x_pos, vals2, color=cols2, width=0.5, edgecolor="none", zorder=3)
-        ax2.set_ylim(0, 118)
-        ax2.set_xticks(x_pos)
-        ax2.set_xticklabels(["Previous", "Predicted"], color=fg, fontsize=8)
-        ax2.tick_params(axis='y', colors=muted, labelsize=7)
-        ax2.set_axisbelow(True)
-        ax2.grid(axis='y', color=border, linewidth=0.5, alpha=0.5)
-        for i, (pos, v) in enumerate(zip(x_pos, vals2)):
-            ax2.text(pos, v + 2, str(v), ha="center", fontsize=11,
-                     color=fg, fontweight="bold")
-        delta = r['final_score'] - int(r["previous"])
-        arrow = "▲" if delta >= 0 else "▼"
-        ax2.text(0.5, 108, f"{arrow} {abs(delta)} pts", ha="center",
-                 fontsize=8.5, color=gcol if delta >= 0 else "#fb7185",
-                 fontweight="700", transform=ax2.get_xaxis_transform())
-        ax2.set_title("② Score Comparison", color=fg, fontsize=9.5,
-                      pad=6, fontweight="bold", loc="left")
-
-        # ── Chart 3: Daily hours (donut) ──
-        study_h = float(r["hours"]); sleep_h = float(r["sleep"])
-        other_h = max(0.0, 24.0 - study_h - sleep_h)
-        ax3 = fig.add_axes([0.58, 0.285, 0.38, 0.185])
-        ax3.set_facecolor(bg2)
-        wedge_data = [study_h, sleep_h, other_h]
-        wedge_cols = [accent, gcol, border]
-        wedges, _ = ax3.pie(
-            wedge_data, colors=wedge_cols, startangle=90,
-            wedgeprops=dict(width=0.5, edgecolor=bg, linewidth=1.5)
-        )
-        # Center text
-        ax3.text(0, 0, "24h", ha="center", va="center",
-                 fontsize=11, fontweight="bold", color=fg)
-        legend_items = [
-            mpatches.Patch(color=accent, label=f"Study  {study_h}h"),
-            mpatches.Patch(color=gcol,   label=f"Sleep  {sleep_h}h"),
-            mpatches.Patch(color=border, label=f"Other  {other_h:.1f}h"),
-        ]
-        ax3.legend(handles=legend_items, loc="lower center", bbox_to_anchor=(0.5, -0.28),
-                   ncol=1, fontsize=7.5, facecolor=bg2, edgecolor=border,
-                   labelcolor=fg, framealpha=0.9)
-        ax3.set_title("③ Daily Hours", color=fg, fontsize=9.5,
-                      pad=6, fontweight="bold", loc="center")
-
-        # ── Input details grid ──
-        ax_det = fig.add_axes([0.06, 0.04, 0.88, 0.23])
-        ax_det.set_facecolor(bg2)
-        for sp in ax_det.spines.values(): sp.set_color(border); sp.set_linewidth(0.5)
-        ax_det.set_xticks([]); ax_det.set_yticks([])
-        ax_det.set_title("Input Details", color=fg, fontsize=9.5,
-                          pad=6, fontweight="bold", loc="left")
-
-        details = [
-            ("Study Hours", f"{r['hours']} hrs/day"),
-            ("Attendance",  f"{int(r['attendance'])}%"),
-            ("Sleep Hours", f"{r['sleep']} hrs/day"),
-            ("Motivation",  r["motivation"]),
-            ("Peer Influence", r["peer"]),
-            ("Teacher Quality", r["teacher"]),
-            ("School Type",    r["school"]),
-            ("Internet",       r["internet"]),
-            ("Parent Inv.",    r["parent_inv"]),
-            ("Resources",      r["resources"]),
-            ("Extracurricular",r["activities"]),
-        ]
-        cols_n = 4
-        for i, (k, v) in enumerate(details):
-            row = i // cols_n; col = i % cols_n
-            x = 0.02 + col * 0.25; y = 0.88 - row * 0.30
-            ax_det.text(x, y,      k, transform=ax_det.transAxes,
-                        fontsize=7.2, color=muted, va="top", fontweight="600")
-            ax_det.text(x, y-.14, v, transform=ax_det.transAxes,
-                        fontsize=8.8, color=fg, fontweight="700", va="top")
-
-        # Footer
-        fig.text(0.5, 0.012, f"ScoreIQ  ·  AI-Powered Academic Predictor  ·  Confidential",
-                 ha="center", fontsize=7.5, color=muted)
-
-        pdf.savefig(fig, facecolor=bg)
-        plt.close(fig)
-
-        # ═══════════════════════════════════════════
-        # PAGE 2 — DETAILED REPORT + SUGGESTIONS
-        # ═══════════════════════════════════════════
-        fig2 = plt.figure(figsize=(8.27, 11.69), facecolor=bg)
-
-        # Header
-        ax_h2 = fig2.add_axes([0, 0.945, 1, 0.055])
-        ax_h2.set_facecolor(bg2)
-        for sp in ax_h2.spines.values(): sp.set_visible(False)
-        ax_h2.set_xticks([]); ax_h2.set_yticks([])
-        grad2 = np.linspace(0, 1, 300).reshape(1, -1)
-        ax_h2.imshow(grad2, aspect='auto', extent=[0,1,0,0.06],
-                     cmap=matplotlib.colors.LinearSegmentedColormap.from_list('g2', [pink, accent, accent2]),
-                     alpha=0.9, transform=ax_h2.transAxes)
-
-        fig2.text(0.5, 0.968, "ScoreIQ — Full Report & Suggestions",
-                  ha="center", fontsize=20, color=fg, fontweight="bold",
-                  fontfamily="serif")
-        fig2.text(0.5, 0.950,
-                  f"{r['sname']}  ·  Score: {r['final_score']}/100  ·  Grade {g}  ·  {r['today']}",
-                  ha="center", fontsize=8.5, color=muted)
-
-        # ── Factor radar (spider chart) ──
-        categories = list(r["factor_scores"].keys())
-        N = len(categories)
-        vals_radar = list(r["factor_scores"].values())
-        angles = [n / float(N) * 2 * np.pi for n in range(N)]
-        angles += angles[:1]
-        vals_radar += vals_radar[:1]
-
-        ax_r = fig2.add_axes([0.04, 0.72, 0.46, 0.22], polar=True)
-        ax_r.set_facecolor(bg2)
-        ax_r.set_xticks(angles[:-1])
-        ax_r.set_xticklabels(categories, color=fg, fontsize=6.5, fontweight="600")
-        ax_r.set_yticks([25,50,75,100])
-        ax_r.set_yticklabels(["25","50","75","100"], color=muted, fontsize=6)
-        ax_r.set_ylim(0,100)
-        ax_r.tick_params(pad=6)
-        ax_r.spines['polar'].set_color(border)
-        ax_r.grid(color=border, linewidth=0.6, alpha=0.7)
-
-        ax_r.plot(angles, vals_radar, color=accent, linewidth=2, linestyle='solid')
-        ax_r.fill(angles, vals_radar, color=accent, alpha=0.15)
-        ax_r.set_title("④ Skills Radar", color=fg, fontsize=9.5,
-                        pad=14, fontweight="bold")
-
-        # ── Score gauge (half donut) ──
-        ax_g = fig2.add_axes([0.55, 0.73, 0.40, 0.20])
-        ax_g.set_facecolor(bg2)
-        ax_g.set_xlim(-1.3, 1.3); ax_g.set_ylim(-0.1, 1.3)
-        ax_g.set_aspect('equal'); ax_g.axis('off')
-
-        # Background semicircle
-        theta_bg = np.linspace(np.pi, 0, 200)
-        r_outer, r_inner = 1.0, 0.65
-        x_bg = np.concatenate([r_outer*np.cos(theta_bg), r_inner*np.cos(theta_bg[::-1])])
-        y_bg = np.concatenate([r_outer*np.sin(theta_bg), r_inner*np.sin(theta_bg[::-1])])
-        ax_g.fill(x_bg, y_bg, color=border, alpha=0.5)
-
-        # Score fill
-        score_angle = np.pi - (r['final_score']/100) * np.pi
-        theta_fill = np.linspace(np.pi, score_angle, 200)
-        x_fill = np.concatenate([r_outer*np.cos(theta_fill), r_inner*np.cos(theta_fill[::-1])])
-        y_fill = np.concatenate([r_outer*np.sin(theta_fill), r_inner*np.sin(theta_fill[::-1])])
-        ax_g.fill(x_fill, y_fill, color=gcol)
-
-        # Zone labels
-        ax_g.text(-1.1, 0.05, "0", fontsize=7, color=muted, ha="center")
-        ax_g.text(0,    1.12, "50", fontsize=7, color=muted, ha="center")
-        ax_g.text(1.1,  0.05, "100", fontsize=7, color=muted, ha="center")
-
-        ax_g.text(0, 0.3, str(r['final_score']), fontsize=24,
-                  fontweight="bold", color=gcol, ha="center", va="center",
-                  fontfamily="serif")
-        ax_g.text(0, 0.08, f"Grade {g}", fontsize=10, color=muted,
-                  ha="center", va="center", fontweight="600")
-        ax_g.set_title("⑤ Score Gauge", color=fg, fontsize=9.5,
-                        pad=4, fontweight="bold")
-
-        # ── Full report table ──
-        ax_tbl = fig2.add_axes([0.04, 0.395, 0.92, 0.315])
-        ax_tbl.set_facecolor(bg2)
-        for sp in ax_tbl.spines.values(): sp.set_color(border); sp.set_linewidth(0.5)
-        ax_tbl.set_xticks([]); ax_tbl.set_yticks([])
-        ax_tbl.set_title("⑥ Complete Report Card", color=fg, fontsize=10,
-                          pad=8, fontweight="bold", loc="left")
-
-        report_rows = [
-            ("Student Name", r['sname']),
-            ("Class / Grade", f"Class {r['student_class']}"),
-            ("Age", f"{r['age_disp']} years"),
-            ("Previous Score", f"{int(r['previous'])} / 100"),
-            ("Predicted Score", f"{r['final_score']} / 100  ·  Grade {g}"),
-            ("Score Change", f"{'▲' if r['final_score']>=r['previous'] else '▼'} {abs(r['final_score']-int(r['previous']))} pts"),
-            ("Study Hours", f"{r['hours']} hrs/day"),
-            ("Attendance", f"{int(r['attendance'])}%"),
-            ("Sleep Hours", f"{r['sleep']} hrs/day"),
-            ("Motivation Level", r['motivation']),
-            ("Peer Influence", r['peer']),
-            ("Teacher Quality", r['teacher']),
-            ("School Type", r['school']),
-            ("Internet Access", r['internet']),
-            ("Parental Involvement", r['parent_inv']),
-            ("Learning Resources", r['resources']),
-            ("Extracurricular", r['activities']),
-        ]
-
-        n_rows = len(report_rows)
-        row_h = 0.88 / n_rows
-        for i, (k, v) in enumerate(report_rows):
-            y = 0.93 - i * row_h
-            # Alternating row tint
-            if i % 2 == 0:
-                ax_tbl.add_patch(mpatches.Rectangle((0, y - row_h*0.85), 1, row_h*0.85,
-                    facecolor=bg, alpha=0.4, transform=ax_tbl.transAxes, zorder=1))
-            ax_tbl.text(0.02, y - row_h*0.3, k, transform=ax_tbl.transAxes,
-                        fontsize=7.8, color=muted, va="center", fontweight="600", zorder=2)
-            val_col = gcol if k == "Predicted Score" else fg
-            ax_tbl.text(0.5, y - row_h*0.3, v, transform=ax_tbl.transAxes,
-                        fontsize=7.8, color=val_col, va="center", fontweight="700", zorder=2)
-
-        # ── Suggestions ──
-        fig2.text(0.06, 0.385, "⑦ Personalised Improvement Tips",
-                  color=fg, fontsize=10, fontweight="bold")
-
-        y_sug = 0.345
-        for icon, title, body in r["tips"][:6]:  # max 6 tips on page
-            ax_s = fig2.add_axes([0.04, y_sug - 0.052, 0.92, 0.048])
-            ax_s.set_facecolor(bg2)
-            for sp in ax_s.spines.values(): sp.set_color(border); sp.set_linewidth(0.5)
-            ax_s.spines['left'].set_color(accent); ax_s.spines['left'].set_linewidth(2.5)
-            ax_s.set_xticks([]); ax_s.set_yticks([])
-
-            ax_s.text(0.015, 0.82, f"{icon}  {title}",
-                      transform=ax_s.transAxes, fontsize=9, color=accent,
-                      fontweight="bold", va="top")
-            # wrap body
-            words = body.split(); lines_out = []; line = ""
-            for w in words:
-                if len(line)+len(w)+1 > 105: lines_out.append(line); line=w
-                else: line=(line+" "+w).strip()
-            if line: lines_out.append(line)
-            ax_s.text(0.015, 0.30, " ".join(lines_out[:1]),
-                      transform=ax_s.transAxes, fontsize=7.5, color=muted, va="top")
-            y_sug -= 0.058
-
-        fig2.text(0.5, 0.012, f"ScoreIQ  ·  AI-Powered Academic Predictor  ·  Confidential  ·  Page 2 of 2",
-                  ha="center", fontsize=7.5, color=muted)
-
-        pdf.savefig(fig2, facecolor=bg)
-        plt.close(fig2)
-
-    buf.seek(0)
-    return buf
+    doc.build(story,onFirstPage=bg,onLaterPages=bg)
+    buf.seek(0); return buf
 
 
-# ══════════════════════════════════════════════════════════
-# PAGE 1 — LOGIN
-# ══════════════════════════════════════════════════════════
-def login_page():
-    theme_toggle("tl")
-    st.markdown('<div class="form-center fade">', unsafe_allow_html=True)
-    st.markdown('<div class="logo-wrap"><span class="logo">ScoreIQ</span></div>', unsafe_allow_html=True)
-    st.markdown('<p class="tagline">AI-powered exam score predictor</p>', unsafe_allow_html=True)
+# ──────────────────────────────────────────────────────────────
+# SIDEBAR
+# ──────────────────────────────────────────────────────────────
+def render_sidebar():
+    users=load_users(); u=st.session_state.username
+    user=users.get(u,{}); nav=st.session_state.nav
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    with st.sidebar:
+        st.markdown(f"""
+        <div class="sb">
+          <div class="sb-logo">
+            <div class="sb-logo-icon">🎓</div>
+            <div>
+              <div class="sb-logo-text">ScoreIQ</div>
+              <div class="sb-logo-sub">Academic Predictor</div>
+            </div>
+          </div>
+          <div class="sb-prof">
+            {avatar_html(user)}
+            <div>
+              <div class="sb-pname">{user.get('name',u)}</div>
+              <div class="sb-prole">{st.session_state.role}</div>
+            </div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="sb-sec">Main</div>', unsafe_allow_html=True)
+        items=[("dashboard","🏠","Dashboard"),("predictor","🔮","Predict Score"),
+               ("results","📊","My Results"),("profile","👤","Profile")]
+        for key,ico,lbl in items:
+            a="on" if nav==key else ""
+            st.markdown(f'<div class="sb-item {a}"><span class="sb-icon">{ico}</span>{lbl}</div>',
+                        unsafe_allow_html=True)
+            if st.button(lbl, key=f"sb_{key}"):
+                if key=="results" and not st.session_state.result:
+                    st.session_state.nav="predictor"
+                else:
+                    st.session_state.nav=key
+                st.rerun()
+
+        st.markdown('<div class="sb-sec">Settings</div>', unsafe_allow_html=True)
+        tlbl="☀️  Light Mode" if DK else "🌙  Dark Mode"
+        if st.button(tlbl, key="sb_theme"):
+            st.session_state.dark=not st.session_state.dark; st.rerun()
+
+        st.markdown('<div class="sb-foot">', unsafe_allow_html=True)
+        if st.button("🚪  Sign Out", key="sb_out"):
+            for k in ["logged_in","username","role"]:
+                st.session_state[k]=False if k=="logged_in" else ""
+            st.session_state.nav="dashboard"; st.session_state.result=None; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ──────────────────────────────────────────────────────────────
+# PAGE: LOGIN
+# ──────────────────────────────────────────────────────────────
+def page_login():
+    _,ct,_=st.columns([1,1,1])
+    with ct:
+        if st.button("☀️" if DK else "🌙",key="lt"): st.session_state.dark=not st.session_state.dark; st.rerun()
+
+    st.markdown('<div class="auth-bg">', unsafe_allow_html=True)
+    st.markdown('<div class="auth-card fade">', unsafe_allow_html=True)
+    st.markdown('<div class="auth-logo">🎓 ScoreIQ</div>', unsafe_allow_html=True)
+    st.markdown('<div class="auth-tag">Sign in to your account</div>', unsafe_allow_html=True)
+
     sec("Sign in as")
-    role = st.radio("rl", ["🎒 Student", "👨‍👩‍👧 Parent"],
-                    horizontal=True, label_visibility="collapsed", key="r_login")
-    role_clean = "Student" if "Student" in role else "Parent"
-    hdiv()
-    sec("Credentials")
-    uname = st.text_input("Username", placeholder="your username", key="l_user")
-    pwd   = st.text_input("Password", type="password", placeholder="••••••••", key="l_pass")
-    st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
+    role=st.radio("lr",["🎒 Student","👨‍👩‍👧 Parent"],horizontal=True,label_visibility="collapsed",key="l_role")
+    rc="Student" if "Student" in role else "Parent"
+    hdiv(); sec("Credentials")
+    un=st.text_input("Username",placeholder="your username",key="l_un")
+    pw=st.text_input("Password",type="password",placeholder="••••••••",key="l_pw")
+    st.markdown("<div style='height:.4rem'></div>",unsafe_allow_html=True)
 
-    if st.button("Sign In →", key="login_btn"):
-        users = load_users(); u = uname.strip().lower()
-        if   not u or not pwd:                st.error("Please fill in all fields.")
-        elif u not in users:                   st.error("Username not found.")
-        elif users[u]["password"] != hp(pwd):  st.error("Incorrect password.")
-        elif users[u]["role"] != role_clean:   st.error(f"Account is registered as {users[u]['role']}.")
+    if st.button("Sign In →",key="l_btn"):
+        users=load_users(); u=un.strip().lower()
+        if   not u or not pw:                st.error("Please fill all fields.")
+        elif u not in users:                 st.error("Username not found.")
+        elif users[u]["password"]!=hp(pw):   st.error("Incorrect password.")
+        elif users[u]["role"]!=rc:           st.error(f"Account is registered as {users[u]['role']}.")
         else:
-            st.session_state.logged_in = True
-            st.session_state.username  = u
-            st.session_state.role      = role_clean
-            st.session_state.page      = "predictor"
-            st.rerun()
+            st.session_state.logged_in=True; st.session_state.username=u
+            st.session_state.role=rc; st.session_state.nav="dashboard"; st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:.84rem;margin:.5rem 0">New here?</p>', unsafe_allow_html=True)
-    st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
-    if st.button("Create an account", key="go_signup"):
-        st.session_state.page = "signup"; st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:.72rem;margin-top:.9rem">Demo: student1 / student123 &nbsp;·&nbsp; parent1 / parent123</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(f'<p style="text-align:center;color:{T["MUTED"]};font-size:.8rem;margin:.75rem 0 .3rem">No account yet?</p>',unsafe_allow_html=True)
+    st.markdown('<div class="ghost">',unsafe_allow_html=True)
+    if st.button("Create an account",key="l_su"): st.session_state.page="signup"; st.rerun()
+    st.markdown('</div>',unsafe_allow_html=True)
+    st.markdown(f'<p style="text-align:center;color:{T["FAINT"]};font-size:.68rem;margin-top:.7rem">Demo: student1/student123 &nbsp;·&nbsp; parent1/parent123</p>',unsafe_allow_html=True)
+    st.markdown('</div></div>',unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# PAGE 2 — SIGN UP
-# ══════════════════════════════════════════════════════════
-def signup_page():
-    theme_toggle("ts")
-    st.markdown('<div class="form-center fade">', unsafe_allow_html=True)
-    st.markdown('<div class="logo-wrap"><span class="logo">ScoreIQ</span></div>', unsafe_allow_html=True)
-    st.markdown('<p class="tagline">Create your account</p>', unsafe_allow_html=True)
+# ──────────────────────────────────────────────────────────────
+# PAGE: SIGN UP  (with simulated OTP)
+# ──────────────────────────────────────────────────────────────
+def page_signup():
+    _,ct,_=st.columns([1,1,1])
+    with ct:
+        if st.button("☀️" if DK else "🌙",key="su_t"): st.session_state.dark=not st.session_state.dark; st.rerun()
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="auth-bg">',unsafe_allow_html=True)
+    st.markdown('<div class="auth-card fade" style="max-width:500px">',unsafe_allow_html=True)
+    st.markdown('<div class="auth-logo">🎓 ScoreIQ</div>',unsafe_allow_html=True)
+    st.markdown('<div class="auth-tag">Create your account</div>',unsafe_allow_html=True)
+
     sec("I am a...")
-    role = st.radio("rs", ["🎒 Student", "👨‍👩‍👧 Parent"],
-                    horizontal=True, label_visibility="collapsed", key="r_signup")
-    role_clean = "Student" if "Student" in role else "Parent"
-    hdiv()
-    sec("Personal details")
-    cls_opts = ["1","2","3","4","5","6","7","8","9","10","11","12","College","Other"]
-    col1, col2 = st.columns(2)
-    with col1:
-        full_name = st.text_input("Full Name", placeholder="e.g. Priya Sharma")
-        dob = st.date_input("Date of Birth", value=date(2008,1,1),
-                            min_value=date(1950,1,1), max_value=date(2020,12,31))
-    with col2:
-        student_cls = st.selectbox("Class / Grade", cls_opts, index=9)
+    role=st.radio("sr",["🎒 Student","👨‍👩‍👧 Parent"],horizontal=True,label_visibility="collapsed",key="su_role")
+    rc="Student" if "Student" in role else "Parent"
+    hdiv(); sec("Personal Details")
+    c1,c2=st.columns(2)
+    with c1:
+        fname=st.text_input("Full Name",placeholder="e.g. Priya Sharma")
+        dob=st.date_input("Date of Birth",value=date(2008,1,1),
+                          min_value=date(1950,1,1),max_value=date(2020,12,31))
+    with c2:
+        su_cls=st.selectbox("Class / Grade",CLS_OPTS,index=9)
+        phone=st.text_input("Phone Number",placeholder="+91 XXXXXXXXXX")
 
-    child_name = child_dob_val = child_cls = ""
-    if role_clean == "Parent":
-        hdiv(); sec("Your child's details")
-        col3, col4 = st.columns(2)
-        with col3:
-            child_name    = st.text_input("Child's Full Name", placeholder="e.g. Rahul Sharma")
-            child_dob_val = st.date_input("Child's Date of Birth", value=date(2010,1,1),
-                                          min_value=date(1995,1,1), max_value=date(2022,12,31))
-        with col4:
-            child_cls = st.selectbox("Child's Class / Grade", cls_opts, index=6)
+    child_name=child_dob_v=child_cls=""
+    if rc=="Parent":
+        hdiv(); sec("Child's Details")
+        c3,c4=st.columns(2)
+        with c3:
+            child_name=st.text_input("Child's Full Name")
+            child_dob_v=st.date_input("Child's Date of Birth",value=date(2010,1,1),
+                                      min_value=date(1995,1,1),max_value=date(2022,12,31))
+        with c4:
+            child_cls=st.selectbox("Child's Class",CLS_OPTS,index=6)
 
-    hdiv(); sec("Account credentials")
-    col5, col6 = st.columns(2)
-    with col5: username = st.text_input("Username", placeholder="min 3 chars")
-    with col6: password = st.text_input("Password", type="password", placeholder="min 6 chars")
-    confirm = st.text_input("Confirm Password", type="password", placeholder="re-enter password")
+    hdiv(); sec("OTP Verification")
+    ph_col,otp_col=st.columns([2,1])
+    with ph_col:
+        st.markdown(f'<div class="otp-info">📱 OTP will be sent to your phone number.<br><small style="opacity:.75">Demo mode: OTP is shown on screen</small></div>',unsafe_allow_html=True)
+    with otp_col:
+        if st.button("📤 Send OTP",key="send_otp"):
+            if not phone.strip(): st.error("Enter phone number first.")
+            else:
+                otp=gen_otp()
+                st.session_state.otp_store={"otp":otp,"phone":phone.strip(),"verified":False}
+                st.success(f"OTP sent! Demo OTP: **{otp}**")
 
-    st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
-    if st.button("Create Account →", key="signup_btn"):
-        users = load_users(); u = username.strip().lower()
-        err = None
-        if   not full_name.strip() or not u or not password or not confirm: err = "Please fill in all fields."
-        elif len(u) < 3:           err = "Username must be at least 3 characters."
-        elif u in users:            err = "Username already taken."
-        elif len(password) < 6:    err = "Password must be at least 6 characters."
-        elif password != confirm:   err = "Passwords do not match."
-        elif role_clean=="Parent" and not child_name.strip(): err = "Please enter your child's name."
+    entered_otp=st.text_input("Enter 6-digit OTP",placeholder="_ _ _ _ _ _",max_chars=6)
 
-        if err:
-            st.error(err)
+    if st.session_state.otp_store.get("otp") and entered_otp:
+        if entered_otp==st.session_state.otp_store["otp"]:
+            st.session_state.otp_store["verified"]=True
+            st.success("✅ Phone verified!")
+        elif len(entered_otp)==6:
+            st.error("Incorrect OTP.")
+
+    hdiv(); sec("Account Credentials")
+    c5,c6=st.columns(2)
+    with c5: uname=st.text_input("Username",placeholder="min 3 chars")
+    with c6: pw=st.text_input("Password",type="password",placeholder="min 6 chars")
+    conf=st.text_input("Confirm Password",type="password")
+
+    st.markdown("<div style='height:.4rem'></div>",unsafe_allow_html=True)
+    if st.button("Create Account →",key="su_btn"):
+        users=load_users(); u=uname.strip().lower(); err=None
+        if not fname.strip() or not u or not pw or not conf: err="Please fill all fields."
+        elif len(u)<3:         err="Username min 3 characters."
+        elif u in users:       err="Username already taken."
+        elif len(pw)<6:        err="Password min 6 characters."
+        elif pw!=conf:         err="Passwords do not match."
+        elif rc=="Parent" and not child_name.strip(): err="Enter child's name."
+        elif not st.session_state.otp_store.get("verified"):
+            err="Please verify your phone number with OTP."
+        if err: st.error(err)
         else:
-            rec = dict(password=hp(password), role=role_clean,
-                       name=full_name.strip(), dob=str(dob), cls=student_cls)
-            if role_clean == "Parent":
-                rec["child_name"] = child_name.strip()
-                rec["child_dob"]  = str(child_dob_val)
-                rec["child_cls"]  = child_cls
-            users[u] = rec; save_users(users)
+            rec=dict(password=hp(pw),role=rc,name=fname.strip(),dob=str(dob),
+                     cls=su_cls,phone=phone.strip(),avatar="",history=[])
+            if rc=="Parent":
+                rec.update(child_name=child_name.strip(),
+                           child_dob=str(child_dob_v),child_cls=child_cls)
+            users[u]=rec; save_users(users)
+            st.session_state.otp_store={}
             st.success("✅ Account created! Redirecting to login...")
-            st.session_state.page = "login"; st.rerun()
+            st.session_state.page="login"; st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown(f'<p style="text-align:center;color:{T["faint"]};font-size:.84rem;margin:.5rem 0">Already have an account?</p>', unsafe_allow_html=True)
-    st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
-    if st.button("Back to Sign In", key="go_login"):
-        st.session_state.page = "login"; st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(f'<p style="text-align:center;color:{T["MUTED"]};font-size:.8rem;margin:.75rem 0 .3rem">Already have an account?</p>',unsafe_allow_html=True)
+    st.markdown('<div class="ghost">',unsafe_allow_html=True)
+    if st.button("Back to Sign In",key="su_back"): st.session_state.page="login"; st.rerun()
+    st.markdown('</div></div></div>',unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# PAGE 3 — PREDICTOR FORM
-# ══════════════════════════════════════════════════════════
-def predictor_page():
-    model, columns = load_model()
-    users  = load_users()
-    uname  = st.session_state.username
-    user   = users.get(uname, {})
-    is_par = st.session_state.role == "Parent"
-    cls_opts = ["1","2","3","4","5","6","7","8","9","10","11","12","College","Other"]
+# ──────────────────────────────────────────────────────────────
+# PAGE: DASHBOARD
+# ──────────────────────────────────────────────────────────────
+def page_dashboard():
+    users=load_users(); u=st.session_state.username
+    user=users.get(u,{}); is_par=st.session_state.role=="Parent"
+    hist=user.get("history",[])
 
-    with st.sidebar:
-        if st.button("☀️ Light" if dm else "🌙 Dark", key="sb_theme"):
-            st.session_state.dark = not st.session_state.dark; st.rerun()
-        initial = (user.get("name","?")[0] or "?").upper()
-        child_info = f'<br>👦 {user["child_name"]} · Class {user.get("child_cls","")}' \
-                     if is_par and "child_name" in user else ""
+    first=user.get("name","").split()[0] or u
+    st.markdown(f"""
+    <div class="pg-hdr fade">
+      <div>
+        <div class="pg-title">Welcome back, {first}! 👋</div>
+        <div class="pg-sub">{date.today().strftime('%A, %d %B %Y')} · Let's check your academic progress</div>
+      </div>
+    </div>""",unsafe_allow_html=True)
+
+    # Stat cards
+    ls=hist[-1]["score"] if hist else "—"
+    bs=max([h["score"] for h in hist],default=0) if hist else "—"
+    av=int(sum(h["score"] for h in hist)/len(hist)) if hist else "—"
+    ct=len(hist)
+
+    sc1,sc2,sc3,sc4=st.columns(4)
+    for col,ico,bg_c,label,val,tag,tag_cls in [
+        (sc1,"🔮",T["TAG"],"Last Score",str(ls),"Latest prediction","mid"),
+        (sc2,"🏆",T["TAG2"],"Best Score",str(bs),"All time high","up"),
+        (sc3,"📊",T["TAG"],"Avg Score",str(av),"Across all runs","mid"),
+        (sc4,"📝",T["TAG2"],"Total Runs",str(ct),"Predictions done","up"),
+    ]:
+        with col:
+            st.markdown(f"""
+            <div class="stat">
+              <div class="stat-ico" style="background:{bg_c}">{ico}</div>
+              <div class="stat-v">{val}</div>
+              <div class="stat-l">{label}</div>
+              <div class="stat-badge {tag_cls}">{tag}</div>
+            </div>""",unsafe_allow_html=True)
+
+    st.markdown("<div style='height:1.2rem'></div>",unsafe_allow_html=True)
+
+    # Score history chart + profile summary
+    lc,rc=st.columns([3,2])
+    with lc:
+        co()
+        sec("📈 Score History")
+        if hist:
+            df=pd.DataFrame(hist).rename(columns={"score":"Predicted Score"})
+            df.index=[f"Run {i+1}" for i in range(len(df))]
+            st.line_chart(df[["Predicted Score"]],use_container_width=True,height=220)
+        else:
+            st.markdown(f'<div style="text-align:center;padding:2.5rem 0;color:{T["MUTED"]};font-size:.87rem">No history yet.<br>Run your first prediction!</div>',unsafe_allow_html=True)
+        cc()
+
+    with rc:
+        co()
+        sec("👤 Quick Profile")
+        sk="child_dob" if is_par else "dob"
+        ck="child_cls" if is_par else "cls"
+        sn=user.get("child_name" if is_par else "name",u)
         st.markdown(f"""
-        <div style="margin-top:.4rem">
-          <div class="sb-avatar">{initial}</div>
-          <div class="sb-name">{user.get('name',uname)}</div>
-          <div class="sb-role">{st.session_state.role}</div>
-          <div class="sb-info">@{uname}<br>Age {calc_age(user.get('dob',''))} · Class {user.get('cls','')}{child_info}</div>
-        </div>""", unsafe_allow_html=True)
-        st.markdown("<div style='height:.8rem'></div>", unsafe_allow_html=True)
-        if st.button("🚪 Sign Out", key="logout"):
-            for k in ["logged_in","username","role"]:
-                st.session_state[k] = False if k=="logged_in" else ""
-            st.session_state.page = "login"; st.session_state.result = None; st.rerun()
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem">
+          {avatar_html(user,54)}
+          <div>
+            <div style="font-weight:800;font-size:.97rem;color:{T['TEXT']}">{sn}</div>
+            <div style="font-size:.74rem;color:{T['MUTED']};margin-top:2px">
+              Class {user.get(ck,'—')} &nbsp;·&nbsp; Age {calc_age(user.get(sk,''))}
+            </div>
+          </div>
+        </div>""",unsafe_allow_html=True)
+        for k,v in [("Role",st.session_state.role),("Username",f"@{u}"),
+                    ("Phone",user.get("phone","—") or "—"),
+                    ("Predictions",str(ct))]:
+            st.markdown(f'<div class="rr"><span class="rk">{k}</span><span class="rv">{v}</span></div>',unsafe_allow_html=True)
+        cc()
 
-    st.markdown('<div class="logo-wrap fade"><span class="logo">ScoreIQ</span></div>', unsafe_allow_html=True)
-    st.markdown(f'<p class="tagline">{"Your child\'s" if is_par else "Your personal"} score predictor</p>', unsafe_allow_html=True)
+    # Recent history
+    if hist:
+        co()
+        sec("🕓 Recent Predictions")
+        for h in reversed(hist[-5:]):
+            gcls,_,_,gcol,gr=grade_cls(h["score"])
+            st.markdown(f"""
+            <div class="hist-item">
+              <span class="hist-date">{h.get('date','—')}</span>
+              <span style="font-weight:700;color:{T['TEXT']}">{h['score']}/100</span>
+              <span class="badge b-{gcls}">{gr}</span>
+            </div>""",unsafe_allow_html=True)
+        cc()
 
-    # Student info
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("🧑 Student Information")
-    c1, c2, c3 = st.columns(3)
+    # Quick actions
+    co()
+    sec("⚡ Quick Actions")
+    qa1,qa2,qa3=st.columns(3)
+    with qa1:
+        if st.button("🔮  Start Prediction",key="qa1"):
+            st.session_state.nav="predictor"; st.rerun()
+    with qa2:
+        if st.button("📊  View Results",key="qa2"):
+            if st.session_state.result: st.session_state.nav="results"; st.rerun()
+            else: st.info("Run a prediction first!")
+    with qa3:
+        if st.button("👤  Edit Profile",key="qa3"):
+            st.session_state.nav="profile"; st.rerun()
+    cc()
+
+
+# ──────────────────────────────────────────────────────────────
+# PAGE: PREDICTOR
+# ──────────────────────────────────────────────────────────────
+def page_predictor():
+    model,columns=load_model()
+    users=load_users(); u=st.session_state.username
+    user=users.get(u,{}); is_par=st.session_state.role=="Parent"
+
+    st.markdown("""
+    <div class="pg-hdr fade">
+      <div>
+        <div class="pg-title">🔮 Predict Score</div>
+        <div class="pg-sub">Fill in academic details for an AI-powered score prediction</div>
+      </div>
+    </div>""",unsafe_allow_html=True)
+
+    co(); sec("🧑 Student Information")
+    c1,c2,c3=st.columns(3)
     with c1:
-        nm = user.get("child_name","") if is_par and "child_name" in user else user.get("name","")
-        st.text_input("Child's Name" if is_par else "Your Name", value=nm, disabled=True)
+        nm=user.get("child_name","") if is_par and "child_name" in user else user.get("name","")
+        st.text_input("Student Name",value=nm,disabled=True)
     with c2:
-        default_cls = user.get("child_cls" if is_par else "cls","10")
-        idx = cls_opts.index(default_cls) if default_cls in cls_opts else 9
-        student_class = st.selectbox("Class / Grade", cls_opts, index=idx)
+        dk=user.get("child_cls" if is_par else "cls","10")
+        idx=CLS_OPTS.index(dk) if dk in CLS_OPTS else 9
+        student_class=st.selectbox("Class / Grade",CLS_OPTS,index=idx)
     with c3:
-        st.metric("Age", f"{calc_age(user.get('child_dob' if is_par else 'dob',''))} yrs")
-    st.markdown('</div>', unsafe_allow_html=True)
+        ak=user.get("child_dob" if is_par else "dob","")
+        st.metric("Age",f"{calc_age(ak)} yrs")
+    cc()
 
-    # Academic
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("📊 Academic Details")
-    c1, c2 = st.columns(2)
+    co(); sec("📚 Academic Details")
+    c1,c2=st.columns(2)
     with c1:
-        hours    = st.number_input("Study Hours / day",  0.0, 24.0,  step=0.5, value=5.0)
-        previous = st.number_input("Previous Score",      0.0, 100.0, step=1.0, value=65.0)
+        hours=st.number_input("Study Hours / Day",0.0,24.0,step=0.5,value=5.0)
+        previous=st.number_input("Previous Score",0.0,100.0,step=1.0,value=65.0)
     with c2:
-        attendance = st.number_input("Attendance %",     0.0, 100.0, step=1.0, value=80.0)
-        sleep      = st.number_input("Sleep Hours / day",0.0, 12.0,  step=0.5, value=7.0)
-    st.markdown('</div>', unsafe_allow_html=True)
+        attendance=st.number_input("Attendance %",0.0,100.0,step=1.0,value=80.0)
+        sleep=st.number_input("Sleep Hours / Day",0.0,12.0,step=0.5,value=7.0)
+    cc()
 
-    # Environment
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("🏫 School & Environment")
-    c3, c4 = st.columns(2)
+    co(); sec("🏫 School & Environment")
+    c3,c4=st.columns(2)
     with c3:
-        motivation = st.selectbox("Motivation Level",     ["Low","Medium","High"], index=1)
-        teacher    = st.selectbox("Teacher Quality",      ["Poor","Average","Good"], index=1)
-        school     = st.selectbox("School Type",          ["Public","Private"])
-        internet   = st.selectbox("Internet Access",      ["Yes","No"])
+        motivation=st.selectbox("Motivation Level",["Low","Medium","High"],index=1)
+        teacher=st.selectbox("Teacher Quality",["Poor","Average","Good"],index=1)
+        school=st.selectbox("School Type",["Public","Private"])
+        internet=st.selectbox("Internet Access",["Yes","No"])
     with c4:
-        income     = st.selectbox("Family Income",        ["Low","Medium","High"], index=1)
-        parent_inv = st.selectbox("Parental Involvement", ["Low","Medium","High"], index=1)
-        education  = st.selectbox("Parent Education",     ["School","College"])
-        peer       = st.selectbox("Peer Influence",       ["Negative","Neutral","Positive"], index=1)
-    c5, c6 = st.columns(2)
-    with c5: resources  = st.selectbox("Learning Resources",         ["Low","Medium","High"], index=1)
-    with c6: activities = st.selectbox("Extracurricular Activities", ["Yes","No"])
-    st.markdown('</div>', unsafe_allow_html=True)
+        income=st.selectbox("Family Income",["Low","Medium","High"],index=1)
+        parent_inv=st.selectbox("Parental Involvement",["Low","Medium","High"],index=1)
+        education=st.selectbox("Parent Education",["School","College"])
+        peer=st.selectbox("Peer Influence",["Negative","Neutral","Positive"],index=1)
+    c5,c6=st.columns(2)
+    with c5: resources=st.selectbox("Learning Resources",["Low","Medium","High"],index=1)
+    with c6: activities=st.selectbox("Extracurricular Activities",["Yes","No"])
+    cc()
 
-    if st.button("✦ Predict My Score", key="predict"):
-        data = dict(
-            Hours_Studied=hours, Attendance=attendance, Previous_Scores=previous,
-            Sleep_Hours=sleep, Motivation_Level=motivation, Teacher_Quality=teacher,
-            School_Type=school, Internet_Access=internet, Family_Income=income,
-            Parental_Involvement=parent_inv, Parental_Education_Level=education,
-            Peer_Influence=peer, Learning_Resources=resources,
-            Extracurricular_Activities=activities
-        )
-        df  = pd.get_dummies(pd.DataFrame([data]))
-        df  = df.reindex(columns=columns, fill_value=0)
-        raw = model.predict(df)[0]
-        final_score = int(round(max(40, min(100, raw))))
+    if st.button("✦  Predict My Score",key="pred_btn"):
+        data=dict(Hours_Studied=hours,Attendance=attendance,Previous_Scores=previous,
+                  Sleep_Hours=sleep,Motivation_Level=motivation,Teacher_Quality=teacher,
+                  School_Type=school,Internet_Access=internet,Family_Income=income,
+                  Parental_Involvement=parent_inv,Parental_Education_Level=education,
+                  Peer_Influence=peer,Learning_Resources=resources,
+                  Extracurricular_Activities=activities)
+        df=pd.get_dummies(pd.DataFrame([data]))
+        df=df.reindex(columns=columns,fill_value=0)
+        raw=model.predict(df)[0]
+        fs=int(round(max(40,min(100,raw))))
+        cls,emoji,remark,bcolor,grade=grade_cls(fs)
 
-        if   final_score >= 75: cls, emoji, remark, bcolor, grade = "ok",  "🏆","Outstanding performance!", T["green"],  "A"
-        elif final_score >= 60: cls, emoji, remark, bcolor, grade = "mid", "📈","Good — keep pushing!",      T["yellow"], "B"
-        elif final_score >= 45: cls, emoji, remark, bcolor, grade = "mid", "📘","Average — more effort needed.", T["yellow"],"C"
-        else:                   cls, emoji, remark, bcolor, grade = "low", "📚","Needs significant improvement.", T["red"], "D"
-
-        factor_scores = {
-            "Study Hours":    min(round(hours/8*100), 100),
-            "Attendance":     int(attendance),
-            "Sleep Quality":  min(round(sleep/9*100), 100),
-            "Motivation":     {"Low":30,"Medium":65,"High":100}[motivation],
-            "Peer Influence": {"Negative":20,"Neutral":60,"Positive":100}[peer],
-            "Learning Res.":  {"Low":30,"Medium":65,"High":100}[resources],
-            "Internet":       100 if internet=="Yes" else 35,
-            "Teacher Quality":{"Poor":30,"Average":65,"Good":100}[teacher],
+        factor_scores={
+            "Study Hours":min(round(hours/8*100),100),
+            "Attendance":int(attendance),
+            "Sleep Quality":min(round(sleep/9*100),100),
+            "Motivation":{"Low":30,"Medium":65,"High":100}[motivation],
+            "Peer Influence":{"Negative":20,"Neutral":60,"Positive":100}[peer],
+            "Learning Res.":{"Low":30,"Medium":65,"High":100}[resources],
+            "Internet":100 if internet=="Yes" else 35,
+            "Teacher":{"Poor":30,"Average":65,"Good":100}[teacher],
         }
+        tips=[]
+        if hours<4:           tips.append(("📖","Study More","Aim for 5–6 focused hours/day. Try Pomodoro: 25 min study, 5 min break."))
+        if attendance<75:     tips.append(("🏫","Boost Attendance","Below 75% means missed lessons. Every class counts."))
+        if sleep<6:           tips.append(("😴","Sleep Better","Under 6 hrs impairs memory. Target 7–8 hrs nightly."))
+        if motivation=="Low": tips.append(("💪","Build Motivation","Set small goals. Track streaks. Reward consistency."))
+        if peer=="Negative":  tips.append(("👫","Positive Peers","Surround yourself with focused, motivated classmates."))
+        if internet=="No":    tips.append(("🌐","Get Online Access","Khan Academy, YouTube & NCERT PDFs are free and powerful."))
+        if resources=="Low":  tips.append(("📚","Better Resources","Visit your library or request extra materials from teachers."))
+        if activities=="No":  tips.append(("⚽","Join Activities","Extracurriculars reduce stress and indirectly improve focus."))
+        if teacher=="Poor":   tips.append(("🎧","Self Study","Supplement with YouTube lectures (NCERT, Unacademy, Khan Academy)."))
+        if parent_inv=="Low": tips.append(("🏠","Parent Support","Share your goals with family — involvement makes a big difference."))
+        if not tips:          tips.append(("✅","All Good!","Excellent habits across the board. Stay consistent and you'll ace it!"))
 
-        tips = []
-        if hours < 4:          tips.append(("📖","Study More","Aim for 5–6 focused hours/day. Pomodoro technique: 25 min study + 5 min break. Track with a simple journal."))
-        if attendance < 75:    tips.append(("🏫","Boost Attendance","Below 75% means critical missed lessons. Each class is a building block — gaps create confusion later."))
-        if sleep < 6:          tips.append(("😴","Sleep Better","Less than 6 hrs severely impairs memory consolidation. Target 7–8 hrs for optimal retention and focus."))
-        if motivation=="Low":  tips.append(("💪","Build Motivation","Set small, achievable daily goals. Use habit-tracking apps, reward streaks, and visualise your target."))
-        if peer=="Negative":   tips.append(("👫","Positive Peers","Your circle shapes your habits. Join study groups with focused, ambitious peers to raise your standards."))
-        if internet=="No":     tips.append(("🌐","Get Online Access","Khan Academy, NCERT solutions, and YouTube lectures are free and powerful learning resources."))
-        if resources=="Low":   tips.append(("📚","Better Resources","Visit the school library, request extra materials from teachers, or join community study groups."))
-        if activities=="No":   tips.append(("⚽","Join Activities","Extracurriculars reduce stress and improve focus, creativity, and time management skills."))
-        if teacher=="Poor":    tips.append(("🎧","Self Study","Supplement weak teaching with NCERT videos, Unacademy or Khan Academy lectures on the same topics."))
-        if parent_inv=="Low":  tips.append(("🏠","Parent Support","Share your study timetable and goals with family. Involved parents help students perform measurably better."))
-        if not tips:           tips.append(("✅","All Good!","Excellent habits across the board! Stay consistent and keep pushing — you're on track for the top."))
+        sname=user.get("child_name" if is_par else "name",u)
+        age_d=calc_age(user.get("child_dob" if is_par else "dob",""))
 
-        sname_disp = user.get("child_name" if is_par else "name", uname)
-        age_disp   = calc_age(user.get("child_dob" if is_par else "dob",""))
-        today_str  = date.today().strftime("%d %B %Y")
+        users[u].setdefault("history",[])
+        users[u]["history"].append({"date":str(date.today()),"score":fs,"grade":grade})
+        save_users(users)
 
-        st.session_state.result = dict(
-            final_score=final_score, grade=grade, cls=cls, emoji=emoji,
-            remark=remark, bcolor=bcolor, factor_scores=factor_scores,
-            previous=previous, hours=hours, sleep=sleep, attendance=attendance,
-            motivation=motivation, peer=peer, teacher=teacher, school=school,
-            internet=internet, parent_inv=parent_inv, resources=resources,
-            activities=activities, tips=tips,
-            sname=sname_disp, age_disp=age_disp, student_class=student_class,
-            today=today_str, dark=st.session_state.dark,
+        st.session_state.result=dict(
+            final_score=fs,grade=grade,cls=cls,emoji=emoji,remark=remark,bcolor=bcolor,
+            factor_scores=factor_scores,previous=previous,hours=hours,sleep=sleep,
+            attendance=attendance,motivation=motivation,peer=peer,teacher=teacher,
+            school=school,internet=internet,parent_inv=parent_inv,resources=resources,
+            activities=activities,tips=tips,sname=sname,age_disp=age_d,
+            student_class=student_class,today=date.today().strftime("%d %B %Y"),
+            dark=st.session_state.dark,
         )
-        st.session_state.page = "result"
-        st.rerun()
+        st.session_state.nav="results"; st.rerun()
 
 
-# ══════════════════════════════════════════════════════════
-# PAGE 4 — RESULTS
-# ══════════════════════════════════════════════════════════
-def result_page():
-    r = st.session_state.result
-    if not r: st.session_state.page = "predictor"; st.rerun(); return
+# ──────────────────────────────────────────────────────────────
+# PAGE: RESULTS
+# ──────────────────────────────────────────────────────────────
+def page_results():
+    r=st.session_state.result
+    if not r:
+        st.info("No results yet. Run a prediction first!")
+        if st.button("Go to Predictor",key="r_gp"): st.session_state.nav="predictor"; st.rerun()
+        return
 
-    users  = load_users()
-    uname  = st.session_state.username
-    user   = users.get(uname, {})
+    fs=r["final_score"]; cls=r["cls"]; bcolor=r["bcolor"]; grade=r["grade"]
+    delta=fs-int(r["previous"]); bcls=f"b-{cls}"
 
-    with st.sidebar:
-        if st.button("☀️ Light" if dm else "🌙 Dark", key="sb_theme_r"):
-            st.session_state.dark = not st.session_state.dark; st.rerun()
-        initial = (user.get("name","?")[0] or "?").upper()
-        st.markdown(f"""
-        <div style="margin-top:.4rem">
-          <div class="sb-avatar">{initial}</div>
-          <div class="sb-name">{user.get('name',uname)}</div>
-          <div class="sb-role">{st.session_state.role}</div>
-          <div class="sb-info">@{uname}</div>
-        </div>""", unsafe_allow_html=True)
-        st.markdown("<div style='height:.8rem'></div>", unsafe_allow_html=True)
-        if st.button("🔙 New Prediction", key="back_sb"):
-            st.session_state.page = "predictor"; st.rerun()
-        if st.button("🚪 Sign Out", key="logout_r"):
-            for k in ["logged_in","username","role"]:
-                st.session_state[k] = False if k=="logged_in" else ""
-            st.session_state.page = "login"; st.session_state.result = None; st.rerun()
+    st.markdown("""
+    <div class="pg-hdr fade">
+      <div>
+        <div class="pg-title">📊 Your Results</div>
+        <div class="pg-sub">AI-powered prediction based on your inputs</div>
+      </div>
+    </div>""",unsafe_allow_html=True)
 
-    st.markdown('<div class="logo-wrap fade"><span class="logo">ScoreIQ</span></div>', unsafe_allow_html=True)
-    st.markdown('<p class="tagline">Your results are ready</p>', unsafe_allow_html=True)
-
-    st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
-    if st.button("← Back to Predictor", key="back_top"):
-        st.session_state.page = "predictor"; st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    final_score = r["final_score"]; cls = r["cls"]; bcolor = r["bcolor"]
-    grade = r["grade"]
-
-    # ── Score Hero ──
+    # Score hero
     st.markdown(f"""
-    <div class="score-hero {cls} fade">
-      <div class="score-emoji">{r['emoji']}</div>
-      <div class="score-number {cls}">{final_score}</div>
-      <div class="score-label">Predicted Score · out of 100</div>
-      <div class="progress-track">
-        <div class="progress-fill" style="width:{final_score}%;"></div>
-      </div>
-      <div class="grade-badge {cls}">Grade {grade}</div>
-      <div class="score-note">{r['remark']}</div>
-    </div>""", unsafe_allow_html=True)
+    <div class="score-hero sh-{cls} fade">
+      <div class="sh-num">{r['emoji']}  {fs}</div>
+      <div class="sh-label">Predicted Score · out of 100</div>
+      <div class="sh-bar"><div class="sh-prog" style="width:{fs}%;background:{bcolor}"></div></div>
+      <div class="sh-note">{r['remark']}</div>
+    </div>""",unsafe_allow_html=True)
 
-    # Quick stats
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.metric("📖 Study",  f"{r['hours']}h/day")
-    with c2: st.metric("😴 Sleep",  f"{r['sleep']}h/day")
-    with c3: st.metric("📅 Attend", f"{int(r['attendance'])}%")
-    delta = final_score - int(r["previous"])
-    with c4: st.metric("📈 Change", f"{'▲' if delta>=0 else '▼'}{abs(delta)}pts",
-                        delta=delta)
-    st.markdown("<div style='height:.6rem'></div>", unsafe_allow_html=True)
+    m1,m2,m3,m4=st.columns(4)
+    with m1: st.metric("📖 Study",f"{r['hours']} h/day")
+    with m2: st.metric("😴 Sleep",f"{r['sleep']} h/day")
+    with m3: st.metric("📅 Attendance",f"{int(r['attendance'])}%")
+    with m4: st.metric("📈 Score Δ",f"{'+' if delta>=0 else ''}{delta} pts")
+    st.markdown("<div style='height:.8rem'></div>",unsafe_allow_html=True)
 
-    # ── Chart 1: Factor Strength ──
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("① Factor Strength Analysis")
-    for name, val in r["factor_scores"].items():
-        if val >= 70:   color = T['green']
-        elif val >= 45: color = T['accent']
-        else:           color = T['red']
-        factor_bar(name, val, color)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Charts row 1
+    cc1,cc2=st.columns(2)
+    with cc1:
+        co(); sec("📊 Chart 1 — Factor Strength")
+        cdf=pd.DataFrame({"Score (%)":list(r["factor_scores"].values())},
+                          index=list(r["factor_scores"].keys()))
+        st.bar_chart(cdf,use_container_width=True,height=250)
+        cc()
+    with cc2:
+        co(); sec("📈 Chart 2 — Score Comparison")
+        sdf=pd.DataFrame({"Score":[int(r["previous"]),fs]},
+                          index=["Previous","Predicted"])
+        st.bar_chart(sdf,use_container_width=True,height=250)
+        cc()
 
-    # ── Chart 2: Score Comparison ──
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("② Previous vs Predicted Score")
-    compare_df = pd.DataFrame({"Score": [int(r["previous"]), final_score]},
-                               index=["Previous Score", "Predicted Score"])
-    st.bar_chart(compare_df, use_container_width=True, height=220)
-    ca, cb = st.columns(2)
-    with ca: st.metric("Previous Score",  f"{int(r['previous'])} / 100")
-    with cb: st.metric("Predicted Score", f"{final_score} / 100",
-                        delta=f"{'▲' if delta>=0 else '▼'} {abs(delta)} pts")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Charts row 2
+    cc3,cc4=st.columns(2)
+    with cc3:
+        co(); sec("🕐 Chart 3 — Daily Hours")
+        sh=float(r["hours"]); sl=float(r["sleep"]); ot=max(0.0,24-sh-sl)
+        hdf=pd.DataFrame({"Hours":[sh,sl,ot]},index=["📖 Study","😴 Sleep","⏳ Other"])
+        st.bar_chart(hdf,use_container_width=True,height=200)
+        cc()
+    with cc4:
+        co(); sec("📉 Chart 4 — Performance Radar")
+        radar_factors={"Study":min(round(r["hours"]/8*100),100),
+                       "Attend.":int(r["attendance"]),
+                       "Sleep":min(round(r["sleep"]/9*100),100),
+                       "Motivat.":{"Low":30,"Medium":65,"High":100}[r["motivation"]],
+                       "Peer":{"Negative":20,"Neutral":60,"Positive":100}[r["peer"]],
+                       "Teacher":{"Poor":30,"Average":65,"Good":100}[r["teacher"]]}
+        rdf=pd.DataFrame({"Your Score":list(radar_factors.values()),
+                           "Ideal":    [100]*6},
+                          index=list(radar_factors.keys()))
+        st.bar_chart(rdf,use_container_width=True,height=200)
+        cc()
 
-    # ── Chart 3: Daily Hours ──
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("③ Daily Hours Breakdown")
-    study_h = float(r["hours"]); sleep_h = float(r["sleep"])
-    other_h = max(0.0, 24.0 - study_h - sleep_h)
-    habits_df = pd.DataFrame({"Hours": [study_h, sleep_h, other_h]},
-                              index=["📖 Study", "😴 Sleep", "⏳ Other"])
-    st.bar_chart(habits_df, use_container_width=True, height=200)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── Full Report Card ──
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("📋 Full Report Card")
-    badge_cls = "ok" if cls=="ok" else "mid" if cls=="mid" else "low"
+    # Report card
+    co(); sec("📋 Full Report Card")
     st.markdown(f"""
-    <div class="report-box">
-      <div class="report-title">📄 Academic Performance Report</div>
-      <div class="report-sub">Generated on {r['today']} &nbsp;·&nbsp; ScoreIQ AI Predictor</div>
-      <div class="rrow"><span class="rkey">Student</span><span class="rval">{r['sname']}</span></div>
-      <div class="rrow"><span class="rkey">Class</span><span class="rval">Class {r['student_class']}</span></div>
-      <div class="rrow"><span class="rkey">Age</span><span class="rval">{r['age_disp']} years</span></div>
-      <div class="rrow"><span class="rkey">Previous Score</span><span class="rval">{int(r['previous'])} / 100</span></div>
-      <div class="rrow">
-        <span class="rkey">Predicted Score</span>
-        <span class="rval" style="color:{bcolor}">{final_score} / 100 &nbsp;
-          <span style="background:{'rgba(52,211,153,.15)' if badge_cls=='ok' else 'rgba(251,191,36,.15)' if badge_cls=='mid' else 'rgba(251,113,133,.15)'};
-                       color:{bcolor};border:1px solid {bcolor};
-                       border-radius:99px;padding:.15rem .7rem;font-size:.75rem">
-            Grade {grade}</span>
-        </span>
+    <div class="rtbl">
+      <div class="rr"><span class="rk">Student</span><span class="rv">{r['sname']}</span></div>
+      <div class="rr"><span class="rk">Class</span><span class="rv">Class {r['student_class']}</span></div>
+      <div class="rr"><span class="rk">Age</span><span class="rv">{r['age_disp']} years</span></div>
+      <div class="rr"><span class="rk">Generated On</span><span class="rv">{r['today']}</span></div>
+      <div class="rr"><span class="rk">Previous Score</span><span class="rv">{int(r['previous'])} / 100</span></div>
+      <div class="rr">
+        <span class="rk">Predicted Score</span>
+        <span class="rv" style="color:{bcolor}">{fs}/100 &nbsp;<span class="badge {bcls}">{grade}</span></span>
       </div>
-      <div class="rrow">
-        <span class="rkey">Score Change</span>
-        <span class="rval" style="color:{T['green'] if final_score>=r['previous'] else T['red']}">
-          {'▲' if final_score>=r['previous'] else '▼'} {abs(final_score-int(r['previous']))} pts
-        </span>
+      <div class="rr">
+        <span class="rk">Score Change</span>
+        <span class="rv" style="color:{T['GREEN'] if delta>=0 else T['RED']}">{'▲' if delta>=0 else '▼'} {abs(delta)} pts</span>
       </div>
-      <div class="rrow"><span class="rkey">Study Hours</span><span class="rval">{r['hours']} hrs/day</span></div>
-      <div class="rrow"><span class="rkey">Attendance</span><span class="rval">{int(r['attendance'])}%</span></div>
-      <div class="rrow"><span class="rkey">Sleep Hours</span><span class="rval">{r['sleep']} hrs/day</span></div>
-      <div class="rrow"><span class="rkey">Motivation</span><span class="rval">{r['motivation']}</span></div>
-      <div class="rrow"><span class="rkey">Peer Influence</span><span class="rval">{r['peer']}</span></div>
-      <div class="rrow"><span class="rkey">Teacher Quality</span><span class="rval">{r['teacher']}</span></div>
-      <div class="rrow"><span class="rkey">School Type</span><span class="rval">{r['school']}</span></div>
-      <div class="rrow"><span class="rkey">Internet Access</span><span class="rval">{r['internet']}</span></div>
-      <div class="rrow"><span class="rkey">Parental Involvement</span><span class="rval">{r['parent_inv']}</span></div>
-      <div class="rrow"><span class="rkey">Learning Resources</span><span class="rval">{r['resources']}</span></div>
-      <div class="rrow"><span class="rkey">Extracurricular</span><span class="rval">{r['activities']}</span></div>
-      <div class="rrow">
-        <span class="rkey">Overall Grade</span>
-        <span class="rval" style="color:{bcolor}">Grade {grade} — {r['remark']}</span>
+      <div class="rr"><span class="rk">Study Hours</span><span class="rv">{r['hours']} h/day</span></div>
+      <div class="rr"><span class="rk">Attendance</span><span class="rv">{int(r['attendance'])}%</span></div>
+      <div class="rr"><span class="rk">Sleep</span><span class="rv">{r['sleep']} h/day</span></div>
+      <div class="rr"><span class="rk">Motivation</span><span class="rv">{r['motivation']}</span></div>
+      <div class="rr"><span class="rk">Peer Influence</span><span class="rv">{r['peer']}</span></div>
+      <div class="rr"><span class="rk">Teacher Quality</span><span class="rv">{r['teacher']}</span></div>
+      <div class="rr"><span class="rk">School Type</span><span class="rv">{r['school']}</span></div>
+      <div class="rr"><span class="rk">Internet Access</span><span class="rv">{r['internet']}</span></div>
+      <div class="rr"><span class="rk">Parental Involvement</span><span class="rv">{r['parent_inv']}</span></div>
+      <div class="rr"><span class="rk">Learning Resources</span><span class="rv">{r['resources']}</span></div>
+      <div class="rr"><span class="rk">Extracurricular</span><span class="rv">{r['activities']}</span></div>
+      <div class="rr">
+        <span class="rk">Overall Grade</span>
+        <span class="badge {bcls}" style="font-size:.76rem;padding:.22rem .85rem">{grade} — {r['remark']}</span>
       </div>
-    </div>""", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    </div>""",unsafe_allow_html=True)
+    cc()
 
-    # ── Suggestions ──
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("💡 Personalised Improvement Plan")
-    for icon, title, body in r["tips"]:
+    # Suggestions
+    co(); sec("💡 Personalised Suggestions")
+    for ico,title,body in r["tips"]:
         st.markdown(f"""
         <div class="sug">
-          <div class="sug-icon">{icon}</div>
-          <div class="sug-body"><div class="sug-title">{title}</div>{body}</div>
-        </div>""", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+          <div class="sug-ico">{ico}</div>
+          <div><div class="sug-t">{title}</div><div class="sug-b">{body}</div></div>
+        </div>""",unsafe_allow_html=True)
+    cc()
 
-    # ── PDF Download ──
-    st.markdown('<div class="card fade">', unsafe_allow_html=True)
-    sec("⬇️ Download Full Report")
-    pdf_buf = build_pdf(r)
-    fname   = f"ScoreIQ_{r['sname'].replace(' ','_')}_{date.today()}.pdf"
-    st.download_button(
-        label="📥 Download PDF Report  (2 pages · 7 charts · full details)",
-        data=pdf_buf, file_name=fname,
-        mime="application/pdf", key="dl_pdf"
-    )
-    st.markdown(f'<p style="font-size:.75rem;color:{T["faint"]};margin-top:.55rem">Includes: Factor bars · Score gauge · Radar chart · Score comparison · Donut chart · Report card · Tips</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Download + Share
+    co(); sec("⬇️ Download & Share")
+    dl,wa=st.columns(2)
+    with dl:
+        pdf=build_pdf(r)
+        fname=f"ScoreIQ_{r['sname'].replace(' ','_')}_{date.today()}.pdf"
+        st.download_button("📥  Download PDF Report",data=pdf,
+                           file_name=fname,mime="application/pdf",key="dl_pdf")
+    with wa:
+        txt=(f"🎓 ScoreIQ Academic Report\n"
+             f"👤 Student: {r['sname']} | Class {r['student_class']}\n"
+             f"📊 Predicted Score: {fs}/100 | Grade: {grade}\n"
+             f"💡 {r['remark']}\n"
+             f"📖 Study: {r['hours']}h/day | 📅 Attend: {int(r['attendance'])}%\n"
+             f"Generated by ScoreIQ 🚀")
+        wa_url="https://wa.me/?text="+txt.replace("\n","%0A").replace(" ","%20")
+        st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-btn">📱  Share on WhatsApp</a>',
+                    unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:.72rem;color:{T["MUTED"]};margin-top:.55rem">PDF includes 4 charts + full report + suggestions across 2 pages.</p>',unsafe_allow_html=True)
+    cc()
 
 
-# ══════════════════════════════════════════════════════════
+# ──────────────────────────────────────────────────────────────
+# PAGE: PROFILE
+# ──────────────────────────────────────────────────────────────
+def page_profile():
+    users=load_users(); u=st.session_state.username
+    user=users.get(u,{}); is_par=st.session_state.role=="Parent"
+
+    st.markdown("""
+    <div class="pg-hdr fade">
+      <div>
+        <div class="pg-title">👤 My Profile</div>
+        <div class="pg-sub">Manage your account, photo and preferences</div>
+      </div>
+    </div>""",unsafe_allow_html=True)
+
+    pl,pr=st.columns([1.1,2.1])
+
+    with pl:
+        co(); sec("🖼️ Profile Picture")
+        st.markdown(f'<div style="display:flex;justify-content:center;margin-bottom:1rem">{avatar_html(user,88)}</div>',unsafe_allow_html=True)
+        upl=st.file_uploader("Upload photo (PNG / JPG)",type=["png","jpg","jpeg"],
+                             label_visibility="collapsed")
+        if upl:
+            b64=base64.b64encode(upl.read()).decode()
+            ext=upl.name.split(".")[-1].lower()
+            mime="image/jpeg" if ext in ("jpg","jpeg") else "image/png"
+            users[u]["avatar"]=f"data:{mime};base64,{b64}"
+            save_users(users); st.success("Photo updated!"); st.rerun()
+        if user.get("avatar"):
+            st.markdown('<div class="ghost">',unsafe_allow_html=True)
+            if st.button("🗑️ Remove Photo",key="rm_av"):
+                users[u]["avatar"]=""; save_users(users); st.rerun()
+            st.markdown('</div>',unsafe_allow_html=True)
+        cc()
+
+        hist=user.get("history",[])
+        co(); sec("📊 My Stats")
+        for k,v in [("Total Predictions",len(hist)),
+                    ("Best Score",max([h["score"] for h in hist],default="—")),
+                    ("Last Score",hist[-1]["score"] if hist else "—"),
+                    ("Role",st.session_state.role)]:
+            st.markdown(f'<div class="rr"><span class="rk">{k}</span><span class="rv">{v}</span></div>',unsafe_allow_html=True)
+        cc()
+
+    with pr:
+        co(); sec("✏️ Edit Details")
+        new_name=st.text_input("Full Name",value=user.get("name",""))
+        ec1,ec2=st.columns(2)
+        with ec1:
+            try: dv=datetime.strptime(user.get("dob","2000-01-01"),"%Y-%m-%d").date()
+            except: dv=date(2000,1,1)
+            new_dob=st.date_input("Date of Birth",value=dv,
+                                  min_value=date(1940,1,1),max_value=date(2020,12,31))
+        with ec2:
+            cc_=user.get("cls","10"); ci=CLS_OPTS.index(cc_) if cc_ in CLS_OPTS else 9
+            new_cls=st.selectbox("Class / Grade",CLS_OPTS,index=ci)
+        new_phone=st.text_input("Phone Number",value=user.get("phone",""))
+
+        if is_par:
+            hdiv(); sec("👦 Child Details")
+            nc=st.text_input("Child's Name",value=user.get("child_name",""))
+            pc1,pc2=st.columns(2)
+            with pc1:
+                try: cdv=datetime.strptime(user.get("child_dob","2010-01-01"),"%Y-%m-%d").date()
+                except: cdv=date(2010,1,1)
+                ncd=st.date_input("Child's DOB",value=cdv,
+                                  min_value=date(1995,1,1),max_value=date(2022,12,31))
+            with pc2:
+                ncc=user.get("child_cls","7"); ncci=CLS_OPTS.index(ncc) if ncc in CLS_OPTS else 6
+                ncls=st.selectbox("Child's Class",CLS_OPTS,index=ncci)
+
+        if st.button("💾  Save Changes",key="sv_prof"):
+            users[u]["name"]=new_name.strip(); users[u]["dob"]=str(new_dob)
+            users[u]["cls"]=new_cls; users[u]["phone"]=new_phone.strip()
+            if is_par:
+                users[u]["child_name"]=nc.strip(); users[u]["child_dob"]=str(ncd)
+                users[u]["child_cls"]=ncls
+            save_users(users); st.success("✅ Profile updated!"); st.rerun()
+        cc()
+
+        co(); sec("🔑 Change Password")
+        op=st.text_input("Current Password",type="password",key="op")
+        np_=st.text_input("New Password",type="password",key="np")
+        cp=st.text_input("Confirm New Password",type="password",key="cp")
+        if st.button("🔒  Update Password",key="upd_pw"):
+            if not op or not np_ or not cp:      st.error("Fill all password fields.")
+            elif users[u]["password"]!=hp(op):   st.error("Current password incorrect.")
+            elif len(np_)<6:                     st.error("New password min 6 chars.")
+            elif np_!=cp:                        st.error("Passwords do not match.")
+            else:
+                users[u]["password"]=hp(np_); save_users(users)
+                st.success("✅ Password updated!")
+        cc()
+
+
+# ──────────────────────────────────────────────────────────────
 # ROUTER
-# ══════════════════════════════════════════════════════════
+# ──────────────────────────────────────────────────────────────
 if not st.session_state.logged_in:
-    if st.session_state.page == "signup":
-        signup_page()
-    else:
-        login_page()
+    if st.session_state.page=="signup": page_signup()
+    else:                               page_login()
 else:
-    if st.session_state.page == "result" and st.session_state.result:
-        result_page()
-    else:
-        predictor_page()
+    render_sidebar()
+    st.markdown('<div class="main">',unsafe_allow_html=True)
+    nav=st.session_state.nav
+    if   nav=="dashboard": page_dashboard()
+    elif nav=="predictor": page_predictor()
+    elif nav=="results":   page_results()
+    elif nav=="profile":   page_profile()
+    else:                  page_dashboard()
+    st.markdown('</div>',unsafe_allow_html=True)
