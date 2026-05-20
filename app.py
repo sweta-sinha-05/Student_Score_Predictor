@@ -1,9 +1,4 @@
 import streamlit as st
-st.set_page_config(
-    page_title="ScoreIQ",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 import joblib
 import pandas as pd
 import json, os, hashlib, io, base64, random
