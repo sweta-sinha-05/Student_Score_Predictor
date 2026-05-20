@@ -150,7 +150,7 @@ section[data-testid="stSidebar"] .block-container {{
     background: {T['SIDEBAR']} !important;
 }}
 
-[data-testid="collapsedControl"] {{ display: none !important; }}
+
 
 /* Sidebar button base — transparent ghost */
 section[data-testid="stSidebar"] .stButton > button {{
