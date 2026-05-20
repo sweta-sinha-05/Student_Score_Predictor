@@ -150,29 +150,29 @@ section[data-testid="stSidebar"] .block-container {{
     background: {T['SIDEBAR']} !important;
 }}
 
+[data-testid="collapsedControl"] {{ display: none !important; }}
 
-
-/* Sidebar button base — transparent ghost */
+/* ═══ SIDEBAR BUTTONS — FULLY VISIBLE ═══ */
 section[data-testid="stSidebar"] .stButton > button {{
-    background: transparent !important;
-    border: none !important;
-    color: {T['TEXT2']} !important;
+    background: {T['CARD2']} !important;
+    border: 1.5px solid {T['BORDER']} !important;
+    color: {T['TEXT']} !important;
     box-shadow: none !important;
     text-align: left !important;
-    padding: 0.45rem 0.75rem !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    border-radius: 8px !important;
+    padding: 0.55rem 0.9rem !important;
+    font-size: 0.84rem !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
     width: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-    transition: background 0.15s, color 0.15s !important;
+    transition: background 0.15s, border-color 0.15s, color 0.15s !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
+    margin-bottom: 0.15rem !important;
 }}
 
 section[data-testid="stSidebar"] .stButton > button:hover {{
     background: {T['TAG']} !important;
-    color: {T['TEXT']} !important;
+    border-color: {T['ACCENT']} !important;
+    color: {T['ACCENT']} !important;
     transform: none !important;
     filter: none !important;
     box-shadow: none !important;
@@ -181,6 +181,30 @@ section[data-testid="stSidebar"] .stButton > button:hover {{
 section[data-testid="stSidebar"] .stButton > button:active {{
     transform: none !important;
     filter: none !important;
+}}
+
+/* Active nav button */
+section[data-testid="stSidebar"] .sb-active-btn .stButton > button {{
+    background: {T['TAG']} !important;
+    border-color: {T['ACCENT']} !important;
+    color: {T['ACCENT']} !important;
+    font-weight: 700 !important;
+}}
+
+/* Theme & signout buttons in sidebar */
+section[data-testid="stSidebar"] .sb-util .stButton > button {{
+    background: transparent !important;
+    border: 1px solid {T['BORDER']} !important;
+    color: {T['TEXT2']} !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    padding: 0.45rem 0.9rem !important;
+    border-radius: 8px !important;
+}}
+section[data-testid="stSidebar"] .sb-util .stButton > button:hover {{
+    background: {T['TAG']} !important;
+    color: {T['TEXT']} !important;
+    border-color: {T['BORDER2']} !important;
 }}
 
 /* ═══ MAIN AREA BUTTONS ═══ */
@@ -1292,36 +1316,42 @@ def render_sidebar():
           <div class="sb-section">Main Menu</div>
         """, unsafe_allow_html=True)
 
-        # Navigation items
+        # ── Navigation buttons (no duplicate HTML) ──
         pages = [
-            ("dashboard", "🏠", "Dashboard"),
-            ("predictor",  "🔮", "Predict Score"),
-            ("results",    "📊", "My Results"),
-            ("profile",    "👤", "Profile"),
+            ("dashboard", "🏠  Dashboard"),
+            ("predictor",  "🔮  Predict Score"),
+            ("results",    "📊  My Results"),
+            ("profile",    "👤  Profile"),
         ]
 
-        for key, ico, lbl in pages:
-            active = "active" if nav == key else ""
-            st.markdown(
-                f'<div class="sb-nav-item {active}"><span class="sb-nav-icon">{ico}</span>{lbl}</div>',
-                unsafe_allow_html=True
-            )
+        st.markdown('<div style="padding:0 0.55rem">', unsafe_allow_html=True)
+        for key, lbl in pages:
+            is_active = nav == key
+            wrapper_cls = "sb-active-btn" if is_active else ""
+            st.markdown(f'<div class="{wrapper_cls}">', unsafe_allow_html=True)
             if st.button(lbl, key=f"sb_{key}", use_container_width=True):
                 if key == "results" and not st.session_state.result:
-                    st.warning("Run a prediction first!")
+                    st.warning("Pehle prediction run karo!")
                 else:
                     st.session_state.nav = key
                     st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="sb-section">Preferences</div>', unsafe_allow_html=True)
+        # ── Divider ──
+        st.markdown(f'<div style="height:1px;background:{T["BORDER"]};margin:0.6rem 0.9rem 0.4rem"></div>',
+                    unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:0.6rem;font-weight:800;color:{T["MUTED"]};letter-spacing:.18em;text-transform:uppercase;padding:0 1.15rem 0.3rem">Preferences</div>',
+                    unsafe_allow_html=True)
 
-        theme_lbl = "☀️  Switch to Light" if DK else "🌙  Switch to Dark"
+        st.markdown('<div style="padding:0 0.55rem"><div class="sb-util">', unsafe_allow_html=True)
+        theme_lbl = "☀️  Light Mode" if DK else "🌙  Dark Mode"
         if st.button(theme_lbl, key="sb_theme", use_container_width=True):
             st.session_state.dark = not st.session_state.dark
             st.rerun()
 
-        st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="height:1px;background:{T["BORDER"]};margin:0.5rem 0"></div>',
+                    unsafe_allow_html=True)
 
         if st.button("🚪  Sign Out", key="sb_out", use_container_width=True):
             for k in ["logged_in", "username", "role"]:
@@ -1329,6 +1359,7 @@ def render_sidebar():
             st.session_state.nav = "dashboard"
             st.session_state.result = None
             st.rerun()
+        st.markdown('</div></div>', unsafe_allow_html=True)
 
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1714,4 +1745,405 @@ def page_predictor():
 
     st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
     st.markdown('<div class="main-area">', unsafe_allow_html=True)
-    if st.button("✦  Predict Score")
+    if st.button("✦  Predict My Score", key="pred_btn"):
+        data = dict(
+            Hours_Studied=hours, Attendance=attendance, Previous_Scores=previous,
+            Sleep_Hours=sleep, Motivation_Level=motivation, Teacher_Quality=teacher,
+            School_Type=school, Internet_Access=internet, Family_Income=income,
+            Parental_Involvement=parent_inv, Parental_Education_Level=education,
+            Peer_Influence=peer, Learning_Resources=resources,
+            Extracurricular_Activities=activities
+        )
+        df = pd.get_dummies(pd.DataFrame([data]))
+        df = df.reindex(columns=columns, fill_value=0)
+        raw = model.predict(df)[0]
+        fs = int(round(max(40, min(100, raw))))
+        cls, emoji, remark, bcolor, grade = grade_info(fs)
+
+        factor_scores = {
+            "Study Hours":   min(round(hours/8*100), 100),
+            "Attendance":    int(attendance),
+            "Sleep Quality": min(round(sleep/9*100), 100),
+            "Motivation":    {"Low":30,"Medium":65,"High":100}[motivation],
+            "Peer Influence":{"Negative":20,"Neutral":60,"Positive":100}[peer],
+            "Learning Res.": {"Low":30,"Medium":65,"High":100}[resources],
+            "Internet":      100 if internet=="Yes" else 35,
+            "Teacher":       {"Poor":30,"Average":65,"Good":100}[teacher],
+        }
+
+        tips = []
+        if hours < 4:           tips.append(("📖","Study More","Aim for 5–6 focused hrs/day. Try Pomodoro: 25 min on, 5 min break."))
+        if attendance < 75:     tips.append(("🏫","Boost Attendance","Below 75% means missed lessons. Every class counts."))
+        if sleep < 6:           tips.append(("😴","Sleep Better","Under 6 hrs impairs memory. Target 7–8 hrs nightly."))
+        if motivation == "Low": tips.append(("💪","Build Motivation","Set small daily goals. Track streaks. Reward consistency."))
+        if peer == "Negative":  tips.append(("👫","Positive Peers","Surround yourself with motivated, focused classmates."))
+        if internet == "No":    tips.append(("🌐","Get Online Access","Khan Academy, YouTube & NCERT PDFs are free and powerful."))
+        if resources == "Low":  tips.append(("📚","Better Resources","Visit your library or request extra materials from teachers."))
+        if activities == "No":  tips.append(("⚽","Join Activities","Extracurriculars reduce stress and improve focus."))
+        if teacher == "Poor":   tips.append(("🎧","Self Study","Use YouTube lectures (NCERT, Unacademy, Khan Academy)."))
+        if parent_inv == "Low": tips.append(("🏠","Parent Support","Share goals with family — involvement helps a lot."))
+        if not tips:            tips.append(("✅","All Good!","Excellent habits! Stay consistent and you'll ace it."))
+
+        sname = user.get("child_name" if is_par else "name", u)
+        age_d = calc_age(user.get("child_dob" if is_par else "dob", ""))
+        users[u].setdefault("history", [])
+        users[u]["history"].append({"date": str(date.today()), "score": fs, "grade": grade})
+        save_users(users)
+
+        st.session_state.result = dict(
+            final_score=fs, grade=grade, cls=cls, emoji=emoji,
+            remark=remark, bcolor=bcolor, factor_scores=factor_scores,
+            previous=previous, hours=hours, sleep=sleep,
+            attendance=attendance, motivation=motivation, peer=peer,
+            teacher=teacher, school=school, internet=internet,
+            parent_inv=parent_inv, resources=resources, activities=activities,
+            tips=tips, sname=sname, age_disp=age_d,
+            student_class=student_class,
+            today=date.today().strftime("%d %B %Y"),
+            dark=st.session_state.dark,
+        )
+        st.session_state.nav = "results"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════
+# RESULTS
+# ══════════════════════════════════════════════════════════
+def page_results():
+    r = st.session_state.result
+    if not r:
+        st.markdown('<div class="empty-state fade-up"><div class="empty-icon">📊</div>No results yet.<br>Run a prediction to see your score!</div>',
+                    unsafe_allow_html=True)
+        st.markdown('<div class="main-area">', unsafe_allow_html=True)
+        if st.button("🔮 Go to Predictor", key="r_gp"):
+            st.session_state.nav = "predictor"; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        return
+
+    fs = r["final_score"]; cls = r["cls"]; bcolor = r["bcolor"]; grade = r["grade"]
+    delta = fs - int(r["previous"]); bcls = f"b-{cls}"
+
+    st.markdown("""
+    <div class="pg-header fade-up">
+      <div class="pg-title-group">
+        <div class="pg-title">📊 Your Results</div>
+        <div class="pg-sub">AI-powered prediction based on your inputs</div>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    # Nav
+    st.markdown('<div class="main-area">', unsafe_allow_html=True)
+    bn1, bn2, _ = st.columns([1.2, 1.5, 5], gap="small")
+    with bn1:
+        st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
+        if st.button("← Dashboard", key="r_dash"):
+            st.session_state.nav = "dashboard"; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    with bn2:
+        st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
+        if st.button("🔮 New Prediction", key="r_new"):
+            st.session_state.nav = "predictor"; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("<div style='height:.7rem'></div>", unsafe_allow_html=True)
+
+    # Score hero
+    st.markdown(f"""
+    <div class="score-hero sh-{cls} fade-up">
+      <div class="sh-label">Predicted Score · out of 100</div>
+      <div class="sh-number">{r['emoji']}  {fs}</div>
+      <div class="sh-track"><div class="sh-fill" style="width:{fs}%;background:{bcolor}"></div></div>
+      <div class="sh-remark">{r['remark']}</div>
+    </div>""", unsafe_allow_html=True)
+
+    # Metrics row
+    m1, m2, m3, m4 = st.columns(4, gap="small")
+    with m1: st.metric("📖 Study Hours",   f"{r['hours']} h/day")
+    with m2: st.metric("😴 Sleep",         f"{r['sleep']} h/day")
+    with m3: st.metric("📅 Attendance",    f"{int(r['attendance'])}%")
+    with m4: st.metric("📈 Score Change",  f"{'+' if delta>=0 else ''}{delta} pts")
+    st.markdown("<div style='height:.9rem'></div>", unsafe_allow_html=True)
+
+    # Charts row 1
+    ch1, ch2 = st.columns(2, gap="medium")
+    with ch1:
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("📊 Factor Strength Analysis")
+        cdf = pd.DataFrame({"Score (%)": list(r["factor_scores"].values())},
+                            index=list(r["factor_scores"].keys()))
+        st.bar_chart(cdf, use_container_width=True, height=240)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with ch2:
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("📈 Previous vs Predicted Score")
+        sdf = pd.DataFrame({"Score": [int(r["previous"]), fs]},
+                            index=["Previous", "Predicted"])
+        st.bar_chart(sdf, use_container_width=True, height=240)
+        ca, cb = st.columns(2)
+        with ca: st.metric("Previous", f"{int(r['previous'])}/100")
+        with cb: st.metric("Predicted", f"{fs}/100",
+                            delta=f"{'+' if delta>=0 else ''}{delta} pts")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Charts row 2
+    ch3, ch4 = st.columns(2, gap="medium")
+    with ch3:
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("⏱️ Daily Hours Breakdown")
+        sh=float(r["hours"]); sl=float(r["sleep"]); ot=max(0.0,24-sh-sl)
+        hdf = pd.DataFrame({"Study":[sh],"Sleep":[sl],"Other":[ot]}, index=["Today"])
+        st.bar_chart(hdf, use_container_width=True, height=200)
+        ha, hb, hc = st.columns(3)
+        with ha: st.metric("Study", f"{sh}h")
+        with hb: st.metric("Sleep", f"{sl}h")
+        with hc: st.metric("Other", f"{ot:.1f}h")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with ch4:
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("🎯 You vs Ideal (100%)")
+        short = {
+            "Study":   min(round(r["hours"]/8*100),100),
+            "Attend":  int(r["attendance"]),
+            "Sleep":   min(round(r["sleep"]/9*100),100),
+            "Motivat": {"Low":30,"Medium":65,"High":100}[r["motivation"]],
+            "Peer":    {"Negative":20,"Neutral":60,"Positive":100}[r["peer"]],
+            "Teacher": {"Poor":30,"Average":65,"Good":100}[r["teacher"]],
+        }
+        line_df = pd.DataFrame({
+            "Your Score": list(short.values()),
+            "Ideal":      [100]*6,
+        }, index=list(short.keys()))
+        st.line_chart(line_df, use_container_width=True, height=200)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Full report card
+    st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+    sec("📋 Full Report Card")
+    st.markdown(f"""
+    <div class="rtable">
+      <div class="rrow"><span class="rkey">Student</span><span class="rval">{r['sname']}</span></div>
+      <div class="rrow"><span class="rkey">Class</span><span class="rval">Class {r['student_class']}</span></div>
+      <div class="rrow"><span class="rkey">Age</span><span class="rval">{r['age_disp']} years</span></div>
+      <div class="rrow"><span class="rkey">Generated</span><span class="rval">{r['today']}</span></div>
+      <div class="rrow"><span class="rkey">Previous Score</span><span class="rval">{int(r['previous'])}/100</span></div>
+      <div class="rrow">
+        <span class="rkey">Predicted Score</span>
+        <span class="rval" style="color:{bcolor}">{fs}/100 &nbsp;<span class="badge {bcls}">{grade}</span></span>
+      </div>
+      <div class="rrow">
+        <span class="rkey">Score Change</span>
+        <span class="rval" style="color:{T['GREEN'] if delta>=0 else T['RED']}">
+          {'▲' if delta>=0 else '▼'} {abs(delta)} pts
+        </span>
+      </div>
+      <div class="rrow"><span class="rkey">Study Hours</span><span class="rval">{r['hours']} h/day</span></div>
+      <div class="rrow"><span class="rkey">Attendance</span><span class="rval">{int(r['attendance'])}%</span></div>
+      <div class="rrow"><span class="rkey">Sleep</span><span class="rval">{r['sleep']} h/day</span></div>
+      <div class="rrow"><span class="rkey">Motivation</span><span class="rval">{r['motivation']}</span></div>
+      <div class="rrow"><span class="rkey">Peer Influence</span><span class="rval">{r['peer']}</span></div>
+      <div class="rrow"><span class="rkey">Teacher Quality</span><span class="rval">{r['teacher']}</span></div>
+      <div class="rrow"><span class="rkey">School Type</span><span class="rval">{r['school']}</span></div>
+      <div class="rrow"><span class="rkey">Internet Access</span><span class="rval">{r['internet']}</span></div>
+      <div class="rrow"><span class="rkey">Parental Involvement</span><span class="rval">{r['parent_inv']}</span></div>
+      <div class="rrow"><span class="rkey">Learning Resources</span><span class="rval">{r['resources']}</span></div>
+      <div class="rrow"><span class="rkey">Extracurricular</span><span class="rval">{r['activities']}</span></div>
+      <div class="rrow">
+        <span class="rkey">Overall Grade</span>
+        <span class="badge {bcls}" style="font-size:.76rem;padding:.22rem .8rem">{grade} — {r['remark']}</span>
+      </div>
+    </div>""", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Suggestions
+    st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+    sec("💡 Personalised Suggestions")
+    for ico, title, body in r["tips"]:
+        st.markdown(f"""
+        <div class="sug-card">
+          <div class="sug-icon">{ico}</div>
+          <div><div class="sug-title">{title}</div><div class="sug-body">{body}</div></div>
+        </div>""", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Download & Share
+    st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+    sec("⬇️ Download & Share Report")
+    dl1, dl2, dl3 = st.columns(3, gap="medium")
+    with dl1:
+        st.markdown('<div class="main-area">', unsafe_allow_html=True)
+        if HAS_RL:
+            pdf = build_pdf(r)
+            if pdf:
+                st.download_button("📥 Download PDF", data=pdf,
+                    file_name=f"ScoreIQ_{r['sname'].replace(' ','_')}_{date.today()}.pdf",
+                    mime="application/pdf", key="dl_pdf")
+        else:
+            st.info("Install reportlab for PDF export")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with dl2:
+        st.markdown('<div class="main-area">', unsafe_allow_html=True)
+        html_b = build_html(r)
+        st.download_button("📄 Download HTML", data=html_b,
+            file_name=f"ScoreIQ_{r['sname'].replace(' ','_')}_{date.today()}.html",
+            mime="text/html", key="dl_html")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with dl3:
+        txt = (f"🎓 ScoreIQ Report\nStudent: {r['sname']} | Class {r['student_class']}\n"
+               f"Score: {fs}/100 | Grade: {grade}\n{r['remark']}\n"
+               f"Study: {r['hours']}h | Attend: {int(r['attendance'])}%\nGenerated by ScoreIQ 🚀")
+        wa_url = "https://wa.me/?text=" + txt.replace("\n","%0A").replace(" ","%20")
+        st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-btn">📱 Share on WhatsApp</a>',
+                    unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:.72rem;color:{T["MUTED"]};margin-top:.6rem">{"PDF + HTML + WhatsApp share available." if HAS_RL else "HTML + WhatsApp available. pip install reportlab for PDF."}</p>',
+                unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("<div style='height:.6rem'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="main-area"><div class="ghost-btn">', unsafe_allow_html=True)
+    if st.button("← Back to Dashboard", key="r_dash2"):
+        st.session_state.nav = "dashboard"; st.rerun()
+    st.markdown('</div></div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════
+# PROFILE
+# ══════════════════════════════════════════════════════════
+def page_profile():
+    users = load_users()
+    u = st.session_state.username
+    user = users.get(u, {})
+    is_par = st.session_state.role == "Parent"
+
+    st.markdown("""
+    <div class="pg-header fade-up">
+      <div class="pg-title-group">
+        <div class="pg-title">👤 My Profile</div>
+        <div class="pg-sub">Manage your account details, photo and security settings</div>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown('<div class="main-area"><div class="ghost-btn">', unsafe_allow_html=True)
+    if st.button("← Dashboard", key="prof_back"):
+        st.session_state.nav = "dashboard"; st.rerun()
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.markdown("<div style='height:.7rem'></div>", unsafe_allow_html=True)
+
+    pl, pr = st.columns([1.3, 2.3], gap="large")
+
+    with pl:
+        # Avatar
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("🖼️ Profile Picture")
+        st.markdown(f'<div style="display:flex;justify-content:center;margin-bottom:1rem">{avatar_large(user)}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="main-area">', unsafe_allow_html=True)
+        upl = st.file_uploader("Upload photo", type=["png","jpg","jpeg"], label_visibility="collapsed")
+        if upl:
+            b64 = base64.b64encode(upl.read()).decode()
+            ext = upl.name.split(".")[-1].lower()
+            mime = "image/jpeg" if ext in ("jpg","jpeg") else "image/png"
+            users[u]["avatar"] = f"data:{mime};base64,{b64}"
+            save_users(users); st.success("Photo updated!"); st.rerun()
+        if user.get("avatar"):
+            st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
+            if st.button("🗑️ Remove Photo", key="rm_av"):
+                users[u]["avatar"] = ""; save_users(users); st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Stats
+        hist = user.get("history", [])
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("📊 My Stats")
+        for k, v in [
+            ("Predictions", len(hist)),
+            ("Best Score", max([h["score"] for h in hist], default="—")),
+            ("Last Score", hist[-1]["score"] if hist else "—"),
+            ("Role", st.session_state.role),
+        ]:
+            st.markdown(f'<div class="rrow"><span class="rkey">{k}</span><span class="rval">{v}</span></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with pr:
+        # Edit profile
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("✏️ Edit Profile Details")
+        st.markdown('<div class="main-area">', unsafe_allow_html=True)
+        new_name = st.text_input("Full Name", value=user.get("name",""))
+        ec1, ec2 = st.columns(2, gap="medium")
+        with ec1:
+            try:    dv = datetime.strptime(user.get("dob","2000-01-01"),"%Y-%m-%d").date()
+            except: dv = date(2000,1,1)
+            new_dob = st.date_input("Date of Birth", value=dv,
+                                     min_value=date(1940,1,1), max_value=date(2020,12,31))
+        with ec2:
+            cc_ = user.get("cls","10"); ci = CLS.index(cc_) if cc_ in CLS else 9
+            new_cls = st.selectbox("Class / Grade", CLS, index=ci)
+        new_phone = st.text_input("Phone Number", value=user.get("phone",""))
+
+        if is_par:
+            hdiv()
+            sec("👦 Child Details")
+            nc = st.text_input("Child's Name", value=user.get("child_name",""))
+            pc1, pc2 = st.columns(2, gap="medium")
+            with pc1:
+                try:    cdv = datetime.strptime(user.get("child_dob","2010-01-01"),"%Y-%m-%d").date()
+                except: cdv = date(2010,1,1)
+                ncd = st.date_input("Child's DOB", value=cdv,
+                                     min_value=date(1995,1,1), max_value=date(2022,12,31))
+            with pc2:
+                ncc = user.get("child_cls","7"); ncci = CLS.index(ncc) if ncc in CLS else 6
+                ncls = st.selectbox("Child's Class", CLS, index=ncci)
+
+        st.markdown("<div style='height:.4rem'></div>", unsafe_allow_html=True)
+        if st.button("💾 Save Changes", key="sv_prof"):
+            users[u]["name"]  = new_name.strip()
+            users[u]["dob"]   = str(new_dob)
+            users[u]["cls"]   = new_cls
+            users[u]["phone"] = new_phone.strip()
+            if is_par:
+                users[u]["child_name"] = nc.strip()
+                users[u]["child_dob"]  = str(ncd)
+                users[u]["child_cls"]  = ncls
+            save_users(users)
+            st.success("✅ Profile updated successfully!")
+            st.rerun()
+        st.markdown('</div></div>', unsafe_allow_html=True)
+
+        # Change password
+        st.markdown('<div class="card fade-up">', unsafe_allow_html=True)
+        sec("🔑 Change Password")
+        st.markdown('<div class="main-area">', unsafe_allow_html=True)
+        op_ = st.text_input("Current Password", type="password", key="op")
+        np_ = st.text_input("New Password",     type="password", key="np")
+        cp_ = st.text_input("Confirm New",      type="password", key="cp")
+        st.markdown("<div style='height:.4rem'></div>", unsafe_allow_html=True)
+        if st.button("🔒 Update Password", key="upd_pw"):
+            if not op_ or not np_ or not cp_:      st.error("Please fill all fields.")
+            elif users[u]["password"] != hp(op_):   st.error("Current password is incorrect.")
+            elif len(np_) < 6:                      st.error("Password must be at least 6 characters.")
+            elif np_ != cp_:                        st.error("Passwords do not match.")
+            else:
+                users[u]["password"] = hp(np_)
+                save_users(users)
+                st.success("✅ Password updated successfully!")
+        st.markdown('</div></div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════
+# ROUTER
+# ══════════════════════════════════════════════════════════
+if not st.session_state.logged_in:
+    if st.session_state.page == "signup":
+        page_signup()
+    else:
+        page_login()
+else:
+    render_sidebar()
+    with st.container():
+        st.markdown('<div class="main-wrap main-area">', unsafe_allow_html=True)
+        nav = st.session_state.nav
+        if   nav == "dashboard": page_dashboard()
+        elif nav == "predictor": page_predictor()
+        elif nav == "results":   page_results()
+        elif nav == "profile":   page_profile()
+        else:                    page_dashboard()
+        st.markdown('</div>', unsafe_allow_html=True)
