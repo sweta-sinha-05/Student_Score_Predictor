@@ -1714,4 +1714,4 @@ def page_predictor():
 
     st.markdown("<div style='height:.5rem'></div>", unsafe_allow_html=True)
     st.markdown('<div class="main-area">', unsafe_allow_html=True)
-    if st.button("✦  Predi
+    if st.button("✦  Predict Score")
