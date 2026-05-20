@@ -131,14 +131,18 @@ html, body, [class*="css"] {{
 .block-container {{ padding: 0 !important; max-width: 100% !important; }}
 
 /* ═══ SIDEBAR — FULLY VISIBLE & STYLED ═══ */
-section[data-testid="stSidebar"] {{
+
+section[data-testid="stSidebar"] {
     background: {T['SIDEBAR']} !important;
     border-right: 1px solid {T['BORDER']} !important;
+    width: 260px !important;
     min-width: 260px !important;
-    max-width: 260px !important;
-    padding: 0 !important;
-    box-shadow: 4px 0 20px rgba(0,0,0,{'.25' if DK else '.06'}) !important;
-}}
+    visibility: visible !important;
+    transform: translateX(0px) !important;
+    margin-left: 0px !important;
+    display: block !important;
+    z-index: 999999 !important;
+}
 
 section[data-testid="stSidebar"] > div:first-child {{
     padding: 0 !important;
