@@ -5,6 +5,10 @@ import numpy as np
 import json, os, hashlib, base64, io, datetime, tempfile, urllib.parse
 import plotly.graph_objects as go
 import plotly.express as px
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
 from PIL import Image
 from fpdf import FPDF
 
@@ -297,24 +301,16 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;border-right:1px s
   background-image:linear-gradient({BORDER} 1px,transparent 1px),linear-gradient(90deg,{BORDER} 1px,transparent 1px);
   background-size:60px 60px;opacity:{'0.12' if D else '0.06'};pointer-events:none;z-index:0}}
 
-/* Role toggle */
-.sv-role-btn{{
-  display:inline-flex;background:{SURF2};border:1px solid {BORDER};
-  border-radius:50px;padding:4px;gap:4px;margin-bottom:20px}}
-.sv-role-btn button{{
-  padding:8px 24px!important;border-radius:50px!important;
-  font-size:13px!important;font-weight:600!important}}
-.sv-role-active{{background:linear-gradient(135deg,{GRAD1},{GRAD2})!important;color:#fff!important}}
-.sv-role-inactive{{background:transparent!important;color:{TX2}!important;box-shadow:none!important}}
-
-/* Theme toggle fixed */
-.sv-theme-toggle{{
-  position:fixed;top:20px;right:20px;z-index:9999;
-  background:{SURF};border:1px solid {BORDER};
-  border-radius:50px;padding:8px 16px;
-  cursor:pointer;font-size:13px;font-weight:600;color:{TX};
-  box-shadow:0 4px 20px rgba(0,0,0,{'0.3' if D else '0.1'});
-  display:flex;align-items:center;gap:6px}}
+/* Theme toggle — fixed circle, emoji only */
+.sv-theme-fab{{
+  position:fixed;top:18px;right:22px;z-index:9999;
+  background:{SURF};border:1.5px solid {BORDER};
+  border-radius:50%;width:46px;height:46px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;cursor:pointer;
+  box-shadow:0 4px 18px rgba(0,0,0,{'0.32' if D else '0.14'});
+  transition:transform .2s,box-shadow .2s}}
+.sv-theme-fab:hover{{transform:scale(1.12)}}
 
 /* WhatsApp button */
 .sv-wa{{
@@ -344,23 +340,47 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;border-right:1px s
 .sv-progress-track{{background:{SURF2};border-radius:50px;height:8px;overflow:hidden;margin-top:6px}}
 .sv-progress-fill{{height:100%;border-radius:50px;background:linear-gradient(90deg,{GRAD1},{GRAD2});
   transition:width .6s cubic-bezier(.34,1.56,.64,1)}}
+
+/* Nav user pill */
+.sv-user-pill{{
+  display:inline-flex;align-items:center;gap:8px;
+  background:{SURF2};border:1px solid {BORDER};
+  border-radius:50px;padding:6px 16px;
+  font-size:13px;font-weight:600;color:{TX};
+  white-space:nowrap}}
 </style>""", unsafe_allow_html=True)
 
     return dict(BG=BG, SURF=SURF, SURF2=SURF2, BORDER=BORDER,
                 TX=TX, TX2=TX2, TX3=TX3, AC=AC, AC2=AC2, ACBG=ACBG,
                 GR=GR, GRBG=GRBG, GO=GO, GOBG=GOBG, RD=RD, RDBG=RDBG,
-                GRAD1=GRAD1, GRAD2=GRAD2)
+                GRAD1=GRAD1, GRAD2=GRAD2, D=D)
 
 # ─────────────────────────────────────────────
-# FLOATING THEME TOGGLE
+# THEME TOGGLE (emoji circle FAB — no blank column)
 # ─────────────────────────────────────────────
-def floating_theme_toggle():
-    ico = "☀️ Light" if st.session_state.dark else "🌙 Dark"
-    cols = st.columns([20, 1])
-    with cols[1]:
-        if st.button(ico, key="float_theme"):
-            st.session_state.dark = not st.session_state.dark
-            st.rerun()
+def theme_fab(t, key="fab_theme"):
+    """Renders a fixed-position circle emoji toggle. No column needed."""
+    ico = "☀️" if st.session_state.dark else "🌙"
+    # Use st.markdown for the visual circle, and a hidden button for the click
+    st.markdown(f"""
+    <style>
+    /* Hide the real button but keep it clickable via absolute overlay */
+    div[data-testid="stButton"][id="fab-{key}"] > div > button {{
+      position:fixed!important;top:18px!important;right:22px!important;
+      z-index:9999!important;
+      width:46px!important;height:46px!important;min-width:unset!important;
+      border-radius:50%!important;padding:0!important;
+      font-size:22px!important;line-height:1!important;
+      background:{t['SURF']}!important;
+      border:1.5px solid {t['BORDER']}!important;
+      box-shadow:0 4px 18px rgba(0,0,0,{'0.32' if t['D'] else '0.14'})!important;
+      color:{t['TX']}!important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+    if st.button(ico, key=key):
+        st.session_state.dark = not st.session_state.dark
+        st.rerun()
 
 # ─────────────────────────────────────────────
 # TOPBAR NAV
@@ -368,33 +388,40 @@ def floating_theme_toggle():
 def topbar(t):
     db   = load_db()
     u    = st.session_state.user or ""
-    name = db.get(u, {}).get("name", u)
-    role = db.get(u, {}).get("role", "student")
+    udata = db.get(u, {})
+    name = udata.get("name", u)
+    role = udata.get("role", "student")
     ico  = "🎓" if role == "student" else "👨‍👩‍👦"
+    theme_ico = "☀️" if st.session_state.dark else "🌙"
 
     st.markdown(f"""<div class="sv-topbar">
       <div class="sv-logo">🔭 ScoreVision AI</div>
-      <div style="font-size:13px;color:{t['TX2']};font-weight:500">{ico} {name}</div>
+      <div class="sv-user-pill">{ico} {name}</div>
     </div>""", unsafe_allow_html=True)
 
-    c = st.columns(8)
-    labels = ["🏠 Home", "🔮 Predict", "📊 Results", "👤 Profile",
-              "☀️ Light" if st.session_state.dark else "🌙 Dark",
-              "🚪 Logout"]
-    pages  = ["dashboard", "predict", "results", "profile", None, None]
-    for i, (col, lbl, pg) in enumerate(zip(c[:6], labels, pages)):
+    c = st.columns([1,1,1,1,0.5,1,4])
+    nav_items = [
+        ("🏠 Home",    "dashboard"),
+        ("🔮 Predict", "predict"),
+        ("📊 Results", "results"),
+        ("👤 Profile", "profile"),
+        (theme_ico,    "__theme__"),
+        ("🚪 Logout",  "__logout__"),
+    ]
+    for i, ((lbl, action), col) in enumerate(zip(nav_items, c)):
         with col:
-            if st.button(lbl, key=f"nav_{i}"):
-                if "Light" in lbl or "Dark" in lbl:
+            kw = {"use_container_width": action != "__theme__"}
+            if st.button(lbl, key=f"nav_{i}", **kw):
+                if action == "__theme__":
                     st.session_state.dark = not st.session_state.dark
                     st.rerun()
-                elif lbl == "🚪 Logout":
+                elif action == "__logout__":
                     st.session_state.logged_in = False
                     st.session_state.user = None
                     st.session_state.result = None
                     goto("login")
                 else:
-                    goto(pg)
+                    goto(action)
 
 # ─────────────────────────────────────────────
 # GRADE HELPER
@@ -434,15 +461,134 @@ def suggestions(score, inp):
     return tips
 
 # ─────────────────────────────────────────────
+# MATPLOTLIB CHART GENERATORS (for PDF)
+# ─────────────────────────────────────────────
+def make_radar_chart(inp):
+    factor_map = {
+        "Motivation":  {"Low": 25, "Medium": 60, "High": 90},
+        "Teacher":     {"Poor": 25, "Average": 60, "Good": 90},
+        "Peer Inf.":   {"Negative": 20, "Neutral": 55, "Positive": 85},
+        "Resources":   {"Low": 25, "Medium": 60, "High": 90},
+        "Internet":    {"No": 30, "Yes": 80},
+        "Involvement": {"Low": 25, "Medium": 60, "High": 90},
+    }
+    cats = list(factor_map.keys())
+    vals = [
+        factor_map["Motivation"].get(inp["Motivation_Level"], 50),
+        factor_map["Teacher"].get(inp["Teacher_Quality"], 50),
+        factor_map["Peer Inf."].get(inp["Peer_Influence"], 50),
+        factor_map["Resources"].get(inp["Learning_Resources"], 50),
+        factor_map["Internet"].get(inp["Internet_Access"], 50),
+        factor_map["Involvement"].get(inp["Parental_Involvement"], 50),
+    ]
+    N = len(cats)
+    angles = [n / float(N) * 2 * np.pi for n in range(N)]
+    vals_plot = vals + [vals[0]]
+    angles_plot = angles + [angles[0]]
+
+    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+    ax.set_facecolor("#f0f4f8")
+    fig.patch.set_facecolor("#ffffff")
+    ax.plot(angles_plot, vals_plot, color="#0284c7", linewidth=2.5)
+    ax.fill(angles_plot, vals_plot, color="#0284c7", alpha=0.18)
+    ax.set_xticks(angles)
+    ax.set_xticklabels(cats, fontsize=10, color="#334e68", fontweight="bold")
+    ax.set_ylim(0, 100)
+    ax.set_yticks([25, 50, 75, 100])
+    ax.set_yticklabels(["25", "50", "75", "100"], color="#627d98", fontsize=8)
+    ax.grid(color="#dce4ef", linestyle="--", linewidth=0.8)
+    ax.set_title("Factor Radar", fontsize=13, fontweight="bold", color="#0f1c2e", pad=20)
+    buf = io.BytesIO()
+    plt.tight_layout()
+    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()
+
+def make_bar_chart(inp):
+    bar_labels = ["Study Hours\n(per 8h)", "Attendance (%)", "Prev Score (%)", "Sleep Quality\n(per 8h)"]
+    bar_vals = [
+        min(100, inp["Hours_Studied"] / 8 * 100),
+        min(100, inp["Attendance"]),
+        min(100, inp["Previous_Scores"]),
+        min(100, inp["Sleep_Hours"] / 8 * 100),
+    ]
+    colors = ["#047857" if v >= 70 else ("#b45309" if v >= 45 else "#b91c1c") for v in bar_vals]
+    fig, ax = plt.subplots(figsize=(6, 3.5))
+    ax.set_facecolor("#f7f9fc")
+    fig.patch.set_facecolor("#ffffff")
+    bars = ax.barh(bar_labels, bar_vals, color=colors, height=0.5, edgecolor="white")
+    for bar, val in zip(bars, bar_vals):
+        ax.text(bar.get_width() + 1.5, bar.get_y() + bar.get_height() / 2,
+                f"{val:.0f}%", va="center", ha="left", fontsize=10,
+                color="#0f1c2e", fontweight="bold")
+    ax.set_xlim(0, 115)
+    ax.set_xlabel("Score (%)", fontsize=10, color="#334e68")
+    ax.set_title("Score Breakdown", fontsize=13, fontweight="bold", color="#0f1c2e", pad=12)
+    ax.tick_params(axis="y", labelsize=9, colors="#334e68")
+    ax.tick_params(axis="x", labelsize=9, colors="#334e68")
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.spines[["left", "bottom"]].set_color("#dce4ef")
+    ax.grid(axis="x", color="#dce4ef", linestyle="--", linewidth=0.6, alpha=0.7)
+    buf = io.BytesIO()
+    plt.tight_layout()
+    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()
+
+def make_gauge_chart(score, previous_score):
+    fig, ax = plt.subplots(figsize=(6, 3.5), subplot_kw=dict(aspect="equal"))
+    fig.patch.set_facecolor("#ffffff")
+    theta = np.linspace(np.pi, 0, 300)
+    ax.plot(np.cos(theta), np.sin(theta), color="#dce4ef", linewidth=28, solid_capstyle="round")
+    for start, end, color in [
+        (np.pi, np.pi * 0.5, "#fee2e2"),
+        (np.pi * 0.5, np.pi * 0.3, "#fef3c7"),
+        (np.pi * 0.3, 0, "#d1fae5"),
+    ]:
+        t2 = np.linspace(start, end, 100)
+        ax.plot(np.cos(t2), np.sin(t2), color=color, linewidth=26)
+    score_angle = np.pi - (score / 100) * np.pi
+    t_score = np.linspace(np.pi, score_angle, 200)
+    ax.plot(np.cos(t_score), np.sin(t_score), color="#0284c7", linewidth=18, solid_capstyle="round")
+    ax.annotate("", xy=(0.72 * np.cos(score_angle), 0.72 * np.sin(score_angle)),
+                xytext=(0, 0),
+                arrowprops=dict(arrowstyle="-|>", color="#0f1c2e", lw=2.5, mutation_scale=18))
+    ax.plot(0, 0, "o", color="#0f1c2e", markersize=10)
+    ax.text(0, -0.28, f"{score}", ha="center", va="center",
+            fontsize=34, fontweight="bold", color="#0284c7")
+    ax.text(0, -0.50, f"Predicted Score  |  Prev: {previous_score}",
+            ha="center", va="center", fontsize=9, color="#627d98")
+    ax.text(-1.0, -0.08, "0", ha="center", fontsize=9, color="#627d98")
+    ax.text(1.05, -0.08, "100", ha="center", fontsize=9, color="#627d98")
+    ax.text(0, 1.08, "Performance Gauge", ha="center",
+            fontsize=13, fontweight="bold", color="#0f1c2e")
+    ax.set_xlim(-1.3, 1.3)
+    ax.set_ylim(-0.65, 1.25)
+    ax.axis("off")
+    buf = io.BytesIO()
+    plt.tight_layout()
+    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    return buf.getvalue()
+
+# ─────────────────────────────────────────────
 # PDF REPORT GENERATOR
 # ─────────────────────────────────────────────
-def generate_pdf(user_data, result, inp, chart_bytes_list):
+def generate_pdf(user_data, result, inp):
     score = result["score"]
     g, desc, _, em = grade(score)
+
+    chart_bytes_list = []
+    try:
+        chart_bytes_list.append(("Factor Radar",      make_radar_chart(inp)))
+        chart_bytes_list.append(("Score Breakdown",   make_bar_chart(inp)))
+        chart_bytes_list.append(("Performance Gauge", make_gauge_chart(score, inp["Previous_Scores"])))
+    except Exception:
+        pass
+
     pdf = FPDF()
     pdf.add_page()
 
-    # Header bar
     pdf.set_fill_color(2, 132, 199)
     pdf.rect(0, 0, 210, 45, 'F')
     pdf.set_font("Helvetica", "B", 24)
@@ -453,25 +599,22 @@ def generate_pdf(user_data, result, inp, chart_bytes_list):
     pdf.set_text_color(20, 30, 50)
     pdf.ln(10)
 
-    # Student Info
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_fill_color(224, 242, 254)
     pdf.cell(0, 10, " Student Information", ln=True, fill=True)
     pdf.ln(3)
-    info = [
-        ("Name", user_data.get("name", "—")),
+    for lbl, val in [
+        ("Name",     user_data.get("name", "—")),
         ("Username", user_data.get("username", "—")),
-        ("Role", user_data.get("role", "—").capitalize()),
-        ("Class", user_data.get("class", "—")),
-        ("Gender", user_data.get("gender", "—")),
-        ("Date of Birth", user_data.get("dob", "—")),
-    ]
-    for lbl, val in info:
+        ("Role",     user_data.get("role", "—").capitalize()),
+        ("Class",    user_data.get("class", "—")),
+        ("Gender",   user_data.get("gender", "—")),
+        ("DOB",      user_data.get("dob", "—")),
+    ]:
         pdf.set_font("Helvetica", "B", 11); pdf.cell(55, 8, f"  {lbl}:", border="B")
         pdf.set_font("Helvetica", "",  11); pdf.cell(0,  8, f"  {val}", border="B", ln=True)
     pdf.ln(10)
 
-    # Score
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_fill_color(224, 242, 254)
     pdf.cell(0, 10, " Prediction Result", ln=True, fill=True)
@@ -484,37 +627,34 @@ def generate_pdf(user_data, result, inp, chart_bytes_list):
     pdf.cell(0, 10, f"  Grade: {g}  |  {desc}", ln=True)
     pdf.ln(8)
 
-    # Input Parameters
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_fill_color(224, 242, 254)
     pdf.cell(0, 10, " Input Parameters", ln=True, fill=True)
     pdf.ln(3)
     params = [
-        ("Hours Studied", f"{inp['Hours_Studied']} hrs/day"),
-        ("Attendance", f"{inp['Attendance']}%"),
-        ("Previous Score", f"{inp['Previous_Scores']}"),
-        ("Sleep Hours", f"{inp['Sleep_Hours']} hrs/day"),
-        ("Motivation Level", inp['Motivation_Level']),
-        ("Teacher Quality", inp['Teacher_Quality']),
-        ("School Type", inp['School_Type']),
-        ("Internet Access", inp['Internet_Access']),
-        ("Family Income", inp['Family_Income']),
-        ("Parental Involvement", inp['Parental_Involvement']),
-        ("Parent Education", inp['Parental_Education_Level']),
-        ("Peer Influence", inp['Peer_Influence']),
+        ("Hours Studied",      f"{inp['Hours_Studied']} hrs/day"),
+        ("Attendance",         f"{inp['Attendance']}%"),
+        ("Previous Score",     f"{inp['Previous_Scores']}"),
+        ("Sleep Hours",        f"{inp['Sleep_Hours']} hrs/day"),
+        ("Motivation Level",   inp['Motivation_Level']),
+        ("Teacher Quality",    inp['Teacher_Quality']),
+        ("School Type",        inp['School_Type']),
+        ("Internet Access",    inp['Internet_Access']),
+        ("Family Income",      inp['Family_Income']),
+        ("Parental Inv.",      inp['Parental_Involvement']),
+        ("Parent Education",   inp['Parental_Education_Level']),
+        ("Peer Influence",     inp['Peer_Influence']),
         ("Learning Resources", inp['Learning_Resources']),
-        ("Extracurricular", inp['Extracurricular_Activities']),
+        ("Extracurricular",    inp['Extracurricular_Activities']),
     ]
-    col_w = 93
     for i in range(0, len(params), 2):
         p1 = params[i]
-        p2 = params[i + 1] if i + 1 < len(params) else ("", "")
-        pdf.set_font("Helvetica", "B", 10); pdf.cell(col_w, 8, f"  {p1[0]}:", border="B")
-        pdf.set_font("Helvetica", "",  10); pdf.cell(col_w, 8, f"  {p1[1]}", border="B")
+        p2 = params[i+1] if i+1 < len(params) else ("","")
+        pdf.set_font("Helvetica","B",10); pdf.cell(93,8,f"  {p1[0]}:",border="B")
+        pdf.set_font("Helvetica","",10);  pdf.cell(93,8,f"  {p1[1]}",border="B")
         pdf.ln()
     pdf.ln(8)
 
-    # Suggestions
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_fill_color(224, 242, 254)
     pdf.cell(0, 10, " Suggestions & Recommendations", ln=True, fill=True)
@@ -525,38 +665,37 @@ def generate_pdf(user_data, result, inp, chart_bytes_list):
         pdf.multi_cell(0, 8, f"  * {clean.strip()}")
     pdf.ln(6)
 
-    # Charts
     if chart_bytes_list:
         pdf.add_page()
         pdf.set_font("Helvetica", "B", 14)
         pdf.set_fill_color(224, 242, 254)
         pdf.cell(0, 10, " Performance Charts", ln=True, fill=True)
-        pdf.ln(4)
-        for cb in chart_bytes_list:
+        pdf.ln(6)
+        for title, cb in chart_bytes_list:
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_text_color(2, 132, 199)
+            pdf.cell(0, 8, f"  {title}", ln=True)
+            pdf.set_text_color(20, 30, 50)
             try:
                 with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                    tmp.write(cb)
-                    tmp.flush()
-                    pdf.image(tmp.name, x=10, w=185)
-                    pdf.ln(6)
+                    tmp.write(cb); tmp.flush()
+                    pdf.image(tmp.name, x=15, w=175)
+                    pdf.ln(8)
                 os.unlink(tmp.name)
             except Exception:
                 pass
 
-    # Footer
     pdf.set_font("Helvetica", "I", 9)
     pdf.set_text_color(150, 150, 170)
     pdf.cell(0, 10, "ScoreVision AI | AI-Powered Student Performance Analysis Platform", align="C")
-
     return bytes(pdf.output())
 
-# ─────────────────────────────────────────────
-# ══════════════  PAGES  ══════════════
-# ─────────────────────────────────────────────
+# ══════════════════════════════════════════════
+#                    PAGES
+# ══════════════════════════════════════════════
 
 # ── LOGIN ──────────────────────────────────────
 def page_login(t):
-    # Animated background elements
     st.markdown("""
     <div class="sv-stars"></div>
     <div class="sv-orb1"></div>
@@ -564,9 +703,8 @@ def page_login(t):
     <div class="sv-grid"></div>
     """, unsafe_allow_html=True)
 
-    floating_theme_toggle()
+    theme_fab(t, key="login_theme_fab")
 
-    # Hero section
     st.markdown(f"""
     <div style="text-align:center;padding:60px 0 40px;position:relative;z-index:1">
       <div style="font-size:64px;margin-bottom:16px;
@@ -590,8 +728,6 @@ def page_login(t):
     with mc:
         st.markdown('<div class="sv-auth">', unsafe_allow_html=True)
 
-        # Role toggle
-        st.markdown('<div style="text-align:center;margin-bottom:6px;">', unsafe_allow_html=True)
         r1, r2 = st.columns(2)
         with r1:
             if st.button("🎓 Student", key="role_student", use_container_width=True):
@@ -601,7 +737,6 @@ def page_login(t):
             if st.button("👨‍👩‍👦 Parent", key="role_parent", use_container_width=True):
                 st.session_state.login_role = "Parent"
                 st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
         role_label = st.session_state.get("login_role", "Student")
         st.markdown(f"""
@@ -640,7 +775,7 @@ def page_signup(t):
     <div class="sv-orb2"></div>
     """, unsafe_allow_html=True)
 
-    floating_theme_toggle()
+    theme_fab(t, key="signup_theme_fab")
 
     st.markdown(f"""<div style="text-align:center;padding:40px 0 30px">
       <div style="font-family:'Sora',sans-serif;font-size:36px;font-weight:800;
@@ -928,7 +1063,6 @@ def page_results(t):
     g, desc, pill, em = grade(score)
     sugs  = suggestions(score, inp)
 
-    # ── Score Hero Card ──
     col_hero, col_info = st.columns([1, 2])
     with col_hero:
         st.markdown(f"""
@@ -949,7 +1083,6 @@ def page_results(t):
         </div>""", unsafe_allow_html=True)
 
     with col_info:
-        # Alert
         if score >= 80:
             st.markdown(f'<div class="sv-ag">🎉 Outstanding! You achieved {desc} performance.</div>',
                         unsafe_allow_html=True)
@@ -960,7 +1093,6 @@ def page_results(t):
             st.markdown(f'<div class="sv-ar">⚠️ Predicted score is {score}%. Review the suggestions below to improve.</div>',
                         unsafe_allow_html=True)
 
-        # Quick stats
         st.markdown(f'<div class="sv-card2">', unsafe_allow_html=True)
         stats = [
             ("📚 Hours Studied", f"{inp['Hours_Studied']} hrs/day", inp['Hours_Studied']/8*100),
@@ -986,10 +1118,6 @@ def page_results(t):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── 3 Charts ──
-    chart_bytes = []
-
-    # Chart row 1: Radar + Bar
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f'<div class="sv-sh">📡 Factor Radar</div>'
@@ -1030,18 +1158,6 @@ def page_results(t):
             showlegend=False,
         )
         st.plotly_chart(fig1, use_container_width=True)
-        fig1_static = go.Figure(go.Scatterpolar(
-            r=vals + [vals[0]], theta=cats + [cats[0]],
-            fill="toself", fillcolor="rgba(2,132,199,0.2)",
-            line=dict(color="#0284c7", width=2.5),
-        ))
-        fig1_static.update_layout(
-            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-            paper_bgcolor="white", height=300, margin=dict(l=30, r=30, t=20, b=20))
-        try:
-            chart_bytes.append(fig1_static.to_image(format="png"))
-        except Exception:
-            pass
 
     with col2:
         st.markdown(f'<div class="sv-sh">📊 Score Breakdown</div>'
@@ -1071,19 +1187,7 @@ def page_results(t):
             showlegend=False, bargap=0.4,
         )
         st.plotly_chart(fig2, use_container_width=True)
-        fig2_static = go.Figure(go.Bar(
-            x=bar_cats, y=bar_vals,
-            marker_color=["#059669" if v >= 70 else ("#d97706" if v >= 45 else "#dc2626") for v in bar_vals],
-            text=[f"{v:.0f}%" for v in bar_vals], textposition="outside"))
-        fig2_static.update_layout(
-            paper_bgcolor="white", plot_bgcolor="white", height=300,
-            margin=dict(l=0, r=0, t=20, b=0), yaxis=dict(range=[0, 120]))
-        try:
-            chart_bytes.append(fig2_static.to_image(format="png"))
-        except Exception:
-            pass
 
-    # Chart 3: Gauge
     st.markdown(f'<div class="sv-sh">🎯 Performance Gauge</div>'
                 f'<div class="sv-ss">Where you stand vs your previous score of {inp["Previous_Scores"]}%</div>',
                 unsafe_allow_html=True)
@@ -1115,17 +1219,7 @@ def page_results(t):
         paper_bgcolor="rgba(0,0,0,0)", font_color=t["TX"],
         height=290, margin=dict(l=20, r=20, t=20, b=10))
     st.plotly_chart(fig3, use_container_width=True)
-    fig3_static = go.Figure(go.Indicator(
-        mode="gauge+number", value=score,
-        gauge={"axis": {"range": [0, 100]}, "bar": {"color": "#0284c7"}},
-    ))
-    fig3_static.update_layout(paper_bgcolor="white", height=280, margin=dict(l=20, r=20, t=20, b=10))
-    try:
-        chart_bytes.append(fig3_static.to_image(format="png"))
-    except Exception:
-        pass
 
-    # ── Suggestions ──
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(f'<div class="sv-sh">💡 Personalised Suggestions</div>'
                 f'<div class="sv-ss">Follow these AI-powered recommendations to boost your score</div>',
@@ -1133,7 +1227,6 @@ def page_results(t):
     for tip in sugs:
         st.markdown(f'<div class="sv-sug">{tip}</div>', unsafe_allow_html=True)
 
-    # ── Input Summary ──
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(f'<div class="sv-sh">📋 Input Summary</div>', unsafe_allow_html=True)
     with st.expander("View all inputs used for this prediction"):
@@ -1149,7 +1242,6 @@ def page_results(t):
         df_inp.columns = ["Parameter", "Value"]
         st.dataframe(df_inp, use_container_width=True, hide_index=True)
 
-    # ── Download & Share ──
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(f'<div class="sv-sh">📤 Share & Download</div>'
                 f'<div class="sv-ss">Export your full report or share results on WhatsApp</div>',
@@ -1163,7 +1255,7 @@ def page_results(t):
                 db = load_db()
                 u  = db.get(st.session_state.user, {})
                 try:
-                    pdf_bytes = generate_pdf(u, st.session_state.result, inp, chart_bytes)
+                    pdf_bytes = generate_pdf(u, st.session_state.result, inp)
                     st.download_button(
                         label="⬇️ Download PDF Report",
                         data=pdf_bytes,
