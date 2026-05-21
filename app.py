@@ -404,13 +404,39 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;border-right:1px s
 
 
 # ─────────────────────────────────────────────
-# FLOATING THEME TOGGLE  (emoji-only)
+# FLOATING THEME TOGGLE  (emoji-only, no blank column)
 # ─────────────────────────────────────────────
-def floating_theme_toggle():
+def floating_theme_toggle(t):
     ico = "☀️" if st.session_state.dark else "🌙"
-    # Right-aligned column trick
-    _, col = st.columns([20, 1])
-    with col:
+    # Invisible Streamlit button used for click detection; visually hidden,
+    # replaced by a CSS fixed pill that matches the emoji.
+    st.markdown(f"""
+    <style>
+    #theme-fab-wrap {{
+      position:fixed;top:18px;right:22px;z-index:9999;
+    }}
+    #theme-fab-wrap button {{
+      background:{t['SURF']}!important;
+      border:1.5px solid {t['BORDER']}!important;
+      border-radius:50%!important;
+      width:44px!important;height:44px!important;
+      font-size:22px!important;line-height:1!important;
+      padding:0!important;cursor:pointer;
+      box-shadow:0 4px 16px rgba(0,0,0,{'0.3' if t['D'] else '0.12'})!important;
+      display:flex!important;align-items:center!important;justify-content:center!important;
+      transition:transform .2s,box-shadow .2s!important;
+    }}
+    #theme-fab-wrap button:hover {{
+      transform:scale(1.12)!important;
+      box-shadow:0 6px 22px rgba(0,0,0,{'0.4' if t['D'] else '0.18'})!important;
+    }}
+    </style>
+    <div id="theme-fab-wrap"></div>
+    """, unsafe_allow_html=True)
+
+    # Actual Streamlit button — hidden visually but functional
+    col_hide = st.columns([1])[0]
+    with col_hide:
         if st.button(ico, key="float_theme"):
             st.session_state.dark = not st.session_state.dark
             st.rerun()
@@ -424,30 +450,65 @@ def topbar(t):
     name = db.get(u, {}).get("name", u)
     role = db.get(u, {}).get("role", "student")
     ico  = "🎓" if role == "student" else "👨‍👩‍👦"
+    theme_ico = "☀️" if st.session_state.dark else "🌙"
 
-    st.markdown(f"""<div class="sv-topbar">
-      <div class="sv-logo">🔭 ScoreVision AI</div>
-      <div style="font-size:13px;color:{t['TX2']};font-weight:500">{ico} {name}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f"""
+    <style>
+    .sv-topbar-nav {{
+      background:{t['SURF']};border-bottom:1px solid {t['BORDER']};
+      padding:0 28px;
+      display:flex;align-items:center;justify-content:space-between;
+      position:sticky;top:0;z-index:100;
+      backdrop-filter:blur(12px);
+      box-shadow:0 2px 20px rgba(0,0,0,{'0.2' if t['D'] else '0.06'});
+      height:56px;
+    }}
+    .sv-topbar-left {{ display:flex;align-items:center;gap:24px; }}
+    .sv-topbar-logo {{
+      font-family:'Sora',sans-serif;font-size:20px;font-weight:800;
+      background:linear-gradient(135deg,{t['GRAD1']},{t['GRAD2']});
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      letter-spacing:-0.02em;white-space:nowrap;
+    }}
+    .sv-topbar-user {{
+      display:flex;align-items:center;gap:8px;
+      background:{t['SURF2']};border:1px solid {t['BORDER']};
+      border-radius:50px;padding:6px 14px;
+      font-size:13px;color:{t['TX']};font-weight:600;
+      white-space:nowrap;
+    }}
+    </style>
+    <div class="sv-topbar-nav">
+      <div class="sv-topbar-left">
+        <div class="sv-topbar-logo">🔭 ScoreVision AI</div>
+      </div>
+      <div class="sv-topbar-user">{ico} {name}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    c = st.columns(8)
-    labels = ["🏠 Home", "🔮 Predict", "📊 Results", "👤 Profile",
-              "☀️" if st.session_state.dark else "🌙",
-              "🚪 Logout"]
-    pages  = ["dashboard", "predict", "results", "profile", None, None]
-    for i, (col, lbl, pg) in enumerate(zip(c[:6], labels, pages)):
+    # Nav buttons row
+    c = st.columns([1,1,1,1,0.5,1,3])
+    nav_items = [
+        ("🏠 Home",    "dashboard"),
+        ("🔮 Predict", "predict"),
+        ("📊 Results", "results"),
+        ("👤 Profile", "profile"),
+        (theme_ico,    "__theme__"),
+        ("🚪 Logout",  "__logout__"),
+    ]
+    for i, ((lbl, action), col) in enumerate(zip(nav_items, c)):
         with col:
-            if st.button(lbl, key=f"nav_{i}"):
-                if lbl in ("☀️", "🌙"):
+            if st.button(lbl, key=f"nav_{i}", use_container_width=(action not in ("__theme__",))):
+                if action == "__theme__":
                     st.session_state.dark = not st.session_state.dark
                     st.rerun()
-                elif "Logout" in lbl:
+                elif action == "__logout__":
                     st.session_state.logged_in = False
                     st.session_state.user = None
                     st.session_state.result = None
                     goto("login")
                 else:
-                    goto(pg)
+                    goto(action)
 
 
 # ─────────────────────────────────────────────
