@@ -403,43 +403,7 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;border-right:1px s
                 GRAD1=GRAD1, GRAD2=GRAD2, D=D)
 
 
-# ─────────────────────────────────────────────
-# FLOATING THEME TOGGLE  (emoji-only, no blank column)
-# ─────────────────────────────────────────────
-def floating_theme_toggle(t):
-    ico = "☀️" if st.session_state.dark else "🌙"
-    # Invisible Streamlit button used for click detection; visually hidden,
-    # replaced by a CSS fixed pill that matches the emoji.
-    st.markdown(f"""
-    <style>
-    #theme-fab-wrap {{
-      position:fixed;top:18px;right:22px;z-index:9999;
-    }}
-    #theme-fab-wrap button {{
-      background:{t['SURF']}!important;
-      border:1.5px solid {t['BORDER']}!important;
-      border-radius:50%!important;
-      width:44px!important;height:44px!important;
-      font-size:22px!important;line-height:1!important;
-      padding:0!important;cursor:pointer;
-      box-shadow:0 4px 16px rgba(0,0,0,{'0.3' if t['D'] else '0.12'})!important;
-      display:flex!important;align-items:center!important;justify-content:center!important;
-      transition:transform .2s,box-shadow .2s!important;
-    }}
-    #theme-fab-wrap button:hover {{
-      transform:scale(1.12)!important;
-      box-shadow:0 6px 22px rgba(0,0,0,{'0.4' if t['D'] else '0.18'})!important;
-    }}
-    </style>
-    <div id="theme-fab-wrap"></div>
-    """, unsafe_allow_html=True)
 
-    # Actual Streamlit button — hidden visually but functional
-    col_hide = st.columns([1])[0]
-    with col_hide:
-        if st.button(ico, key="float_theme"):
-            st.session_state.dark = not st.session_state.dark
-            st.rerun()
 
 # ─────────────────────────────────────────────
 # TOPBAR NAV
@@ -821,29 +785,79 @@ def generate_pdf(user_data, result, inp):
 
 # ── LOGIN ──────────────────────────────────────
 def page_login(t):
-    st.markdown("""
+    ico = "☀️" if st.session_state.dark else "🌙"
+
+    st.markdown(f"""
     <div class="sv-stars"></div>
     <div class="sv-orb1"></div>
     <div class="sv-orb2"></div>
     <div class="sv-grid"></div>
+    <style>
+    /* Fixed theme FAB — no blank column needed */
+    .sv-fab-theme {{
+      position:fixed;top:18px;right:22px;z-index:9999;
+      background:{t['SURF']};border:1.5px solid {t['BORDER']};
+      border-radius:50%;width:46px;height:46px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:22px;cursor:pointer;
+      box-shadow:0 4px 18px rgba(0,0,0,{'0.32' if t['D'] else '0.14'});
+      text-decoration:none;
+    }}
+    /* Hide the real Streamlit button visually but keep it clickable */
+    div[data-testid="column"]:has(> div > button[kind="secondary"]#fab-btn-hidden) {{
+      position:fixed;top:18px;right:22px;z-index:9999;
+      width:46px!important;height:46px!important;
+    }}
+    button[kind="secondary"]#fab-btn-hidden {{
+      width:46px!important;height:46px!important;
+      border-radius:50%!important;padding:0!important;
+      font-size:22px!important;
+      background:{t['SURF']}!important;
+      border:1.5px solid {t['BORDER']}!important;
+      box-shadow:0 4px 18px rgba(0,0,0,{'0.32' if t['D'] else '0.14'})!important;
+    }}
+    /* Remove top block-container padding on login page */
+    .main .block-container {{ padding-top:0!important; }}
+    </style>
     """, unsafe_allow_html=True)
 
-    # ── Emoji-only theme toggle top-right ──
-    floating_theme_toggle()
-
-    # Hero
+    # ── Theme FAB (real Streamlit button, styled as circle) ──
+    fab_col = st.columns([1])[0]
+    with fab_col:
+        if st.button(ico, key="float_theme"):
+            st.session_state.dark = not st.session_state.dark
+            st.rerun()
+    # Push the button to fixed position via CSS
     st.markdown(f"""
-    <div style="text-align:center;padding:60px 0 40px;position:relative;z-index:1">
-      <div style="font-size:64px;margin-bottom:16px;
-        filter:drop-shadow(0 0 30px rgba(56,189,248,0.5))">🔭</div>
-      <div style="font-family:'Sora',sans-serif;font-size:48px;font-weight:800;
+    <style>
+    div[data-testid="stHorizontalBlock"]:first-of-type > div:first-child {{
+      position:fixed;top:18px;right:22px;z-index:9999;
+      width:46px!important;flex:none!important;
+    }}
+    div[data-testid="stHorizontalBlock"]:first-of-type > div:first-child > div > button {{
+      width:46px!important;height:46px!important;min-width:unset!important;
+      border-radius:50%!important;padding:0!important;
+      font-size:22px!important;
+      background:{t['SURF']}!important;
+      border:1.5px solid {t['BORDER']}!important;
+      box-shadow:0 4px 18px rgba(0,0,0,{'0.32' if t['D'] else '0.14'})!important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ── Hero ──
+    st.markdown(f"""
+    <div style="text-align:center;padding:52px 0 36px;position:relative;z-index:1">
+      <div style="font-size:60px;margin-bottom:14px;
+        filter:drop-shadow(0 0 28px rgba(56,189,248,0.5))">🔭</div>
+      <div style="font-family:'Sora',sans-serif;font-size:46px;font-weight:800;
         background:linear-gradient(135deg,{t['GRAD1']},{t['GRAD2']});
         -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-        letter-spacing:-0.03em;line-height:1">ScoreVision AI</div>
-      <div style="font-size:16px;color:rgba(255,255,255,0.65);margin-top:12px;
-        font-weight:400;letter-spacing:0.05em">
+        letter-spacing:-0.03em;line-height:1.05">ScoreVision AI</div>
+      <div style="font-size:15px;color:rgba(255,255,255,0.65);margin-top:10px;
+        font-weight:400;letter-spacing:0.04em">
         AI-Powered Student Performance Prediction</div>
-      <div style="display:flex;justify-content:center;gap:8px;margin-top:20px;flex-wrap:wrap">
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:18px;flex-wrap:wrap">
         <span class="sv-feature">✨ ML-Powered</span>
         <span class="sv-feature">📊 Visual Analytics</span>
         <span class="sv-feature">📄 PDF Reports</span>
@@ -851,11 +865,12 @@ def page_login(t):
       </div>
     </div>""", unsafe_allow_html=True)
 
+    # ── Auth Card ──
     _, mc, _ = st.columns([1, 2, 1])
     with mc:
         st.markdown('<div class="sv-auth">', unsafe_allow_html=True)
 
-        # Role selector
+        # Role toggle
         r1, r2 = st.columns(2)
         with r1:
             if st.button("🎓 Student", key="role_student", use_container_width=True):
@@ -863,6 +878,8 @@ def page_login(t):
         with r2:
             if st.button("👨‍👩‍👦 Parent", key="role_parent", use_container_width=True):
                 st.session_state.login_role = "Parent"; st.rerun()
+
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
         role_label = st.session_state.get("login_role", "Student")
         st.markdown(f"""
@@ -873,6 +890,7 @@ def page_login(t):
         username = st.text_input("Username", placeholder="your_username", key="login_user")
         password = st.text_input("Password", type="password", placeholder="••••••••", key="login_pw")
 
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
             if st.button("🚀 Sign In", use_container_width=True):
@@ -889,25 +907,49 @@ def page_login(t):
 
         st.markdown("<hr class='sv-e'>", unsafe_allow_html=True)
         st.markdown(f"""<div style="text-align:center;font-size:12px;color:{t['TX3']}">
-          Protected by end-to-end encryption • Your data is safe</div>""",
+          🔒 Protected by end-to-end encryption • Your data is safe</div>""",
           unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── SIGNUP ─────────────────────────────────────
 def page_signup(t):
-    st.markdown("""
+    ico = "☀️" if st.session_state.dark else "🌙"
+
+    st.markdown(f"""
     <div class="sv-stars"></div>
     <div class="sv-orb1"></div>
     <div class="sv-orb2"></div>
     <div class="sv-grid"></div>
+    <style>
+    .main .block-container {{ padding-top:0!important; }}
+    </style>
     """, unsafe_allow_html=True)
 
-    floating_theme_toggle()
+    # ── Theme FAB ──
+    fab_col = st.columns([1])[0]
+    with fab_col:
+        if st.button(ico, key="float_theme"):
+            st.session_state.dark = not st.session_state.dark
+            st.rerun()
+    st.markdown(f"""
+    <style>
+    div[data-testid="stHorizontalBlock"]:first-of-type > div:first-child {{
+      position:fixed;top:18px;right:22px;z-index:9999;
+      width:46px!important;flex:none!important;
+    }}
+    div[data-testid="stHorizontalBlock"]:first-of-type > div:first-child > div > button {{
+      width:46px!important;height:46px!important;min-width:unset!important;
+      border-radius:50%!important;padding:0!important;font-size:22px!important;
+      background:{t['SURF']}!important;border:1.5px solid {t['BORDER']}!important;
+      box-shadow:0 4px 18px rgba(0,0,0,{'0.32' if t['D'] else '0.14'})!important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
     st.markdown(f"""
-    <div style="text-align:center;padding:40px 0 30px;position:relative;z-index:1">
-      <div style="font-family:'Sora',sans-serif;font-size:36px;font-weight:800;
+    <div style="text-align:center;padding:40px 0 28px;position:relative;z-index:1">
+      <div style="font-family:'Sora',sans-serif;font-size:34px;font-weight:800;
         background:linear-gradient(135deg,{t['GRAD1']},{t['GRAD2']});
         -webkit-background-clip:text;-webkit-text-fill-color:transparent">
         🔭 Join ScoreVision AI</div>
