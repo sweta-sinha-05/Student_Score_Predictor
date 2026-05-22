@@ -9,7 +9,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from PIL import Image
 
-# ReportLab — reliable PDF generation
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import mm
@@ -23,9 +22,6 @@ from reportlab.graphics.shapes import Drawing, Rect, String, Circle, Line
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics import renderPDF
 
-# ─────────────────────────────────────────────
-# PAGE CONFIG
-# ─────────────────────────────────────────────
 st.set_page_config(
     page_title="ScoreVision AI",
     page_icon="🔭",
@@ -33,9 +29,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ─────────────────────────────────────────────
-# LOAD MODEL
-# ─────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     m = joblib.load("student_model.pkl")
@@ -44,9 +37,6 @@ def load_model():
 
 model, columns = load_model()
 
-# ─────────────────────────────────────────────
-# USER DATABASE
-# ─────────────────────────────────────────────
 os.makedirs("data", exist_ok=True)
 DB = "data/users.json"
 
@@ -59,9 +49,6 @@ def save_db(db):
 def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
 
-# ─────────────────────────────────────────────
-# SESSION STATE DEFAULTS
-# ─────────────────────────────────────────────
 for k, v in {
     "page": "landing", "logged_in": False, "user": None,
     "dark": True, "result": None, "login_role": "Student"
@@ -73,9 +60,6 @@ def goto(p):
     st.session_state.page = p
     st.rerun()
 
-# ─────────────────────────────────────────────
-# THEME SYSTEM
-# ─────────────────────────────────────────────
 def apply_theme():
     D = st.session_state.dark
     if D:
@@ -87,6 +71,7 @@ def apply_theme():
         GRAD1="#38bdf8"; GRAD2="#818cf8"
         HERO="linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)"
         STAR="rgba(255,255,255,0.06)"
+        BG_BODY="#080c14"
     else:
         BG="#f0f4f8"; SURF="#ffffff"; SURF2="#f7f9fc"; BORDER="#dce4ef"
         TX="#0f1c2e"; TX2="#4a6080"; TX3="#8aa0be"
@@ -96,6 +81,13 @@ def apply_theme():
         GRAD1="#0284c7"; GRAD2="#6366f1"
         HERO="linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%)"
         STAR="rgba(255,255,255,0.05)"
+        BG_BODY="#f0f4f8"
+
+    # Light mode orb colors (visible on light bg)
+    ORB1_COLOR = "rgba(56,189,248,0.12)" if D else "rgba(2,132,199,0.10)"
+    ORB2_COLOR = "rgba(129,140,248,0.10)" if D else "rgba(99,102,241,0.08)"
+    GRID_COLOR = BORDER
+    GRID_OPACITY = "0.12" if D else "0.25"
 
     st.markdown(f"""<style>
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -193,10 +185,7 @@ label,.stSelectbox label,.stTextInput label,
   margin-bottom:12px;font-size:14px;color:{TX};
   box-shadow:0 2px 8px rgba(0,0,0,{'0.15' if D else '0.04'})}}
 
-/* Auth card */
-.sv-auth{{max-width:500px;margin:0 auto;background:{SURF};
-  border:1px solid {BORDER};border-radius:28px;padding:44px 48px;
-  box-shadow:0 20px 60px rgba(0,0,0,{'0.4' if D else '0.12'})}}
+/* Auth card — removed blank-box-causing wrapper styles */
 .sv-auth-title{{font-family:'Sora',sans-serif;font-size:28px;font-weight:800;
   color:{TX};margin-bottom:6px;letter-spacing:-0.02em}}
 .sv-auth-sub{{font-size:14px;color:{TX2};margin-bottom:28px}}
@@ -265,15 +254,15 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;
   display:flex;align-items:center;justify-content:center}}
 .lp-stars{{position:absolute;top:0;left:0;right:0;bottom:0;
   background-image:
-    radial-gradient(1.5px 1.5px at 15% 25%,{STAR} 0%,transparent 100%),
-    radial-gradient(1px 1px at 75% 12%,{STAR} 0%,transparent 100%),
-    radial-gradient(2px 2px at 50% 65%,{STAR} 0%,transparent 100%),
-    radial-gradient(1px 1px at 8% 80%,{STAR} 0%,transparent 100%),
-    radial-gradient(1.5px 1.5px at 88% 45%,{STAR} 0%,transparent 100%),
-    radial-gradient(1px 1px at 35% 10%,{STAR} 0%,transparent 100%),
-    radial-gradient(2px 2px at 65% 88%,{STAR} 0%,transparent 100%),
-    radial-gradient(1px 1px at 92% 72%,{STAR} 0%,transparent 100%),
-    radial-gradient(1.5px 1.5px at 22% 55%,{STAR} 0%,transparent 100%);
+    radial-gradient(1.5px 1.5px at 15% 25%,rgba(255,255,255,0.08) 0%,transparent 100%),
+    radial-gradient(1px 1px at 75% 12%,rgba(255,255,255,0.06) 0%,transparent 100%),
+    radial-gradient(2px 2px at 50% 65%,rgba(255,255,255,0.07) 0%,transparent 100%),
+    radial-gradient(1px 1px at 8% 80%,rgba(255,255,255,0.05) 0%,transparent 100%),
+    radial-gradient(1.5px 1.5px at 88% 45%,rgba(255,255,255,0.08) 0%,transparent 100%),
+    radial-gradient(1px 1px at 35% 10%,rgba(255,255,255,0.06) 0%,transparent 100%),
+    radial-gradient(2px 2px at 65% 88%,rgba(255,255,255,0.07) 0%,transparent 100%),
+    radial-gradient(1px 1px at 92% 72%,rgba(255,255,255,0.05) 0%,transparent 100%),
+    radial-gradient(1.5px 1.5px at 22% 55%,rgba(255,255,255,0.06) 0%,transparent 100%);
   pointer-events:none;animation:twinkle 4s ease-in-out infinite alternate}}
 @keyframes twinkle{{0%{{opacity:0.6}}100%{{opacity:1}}}}
 .lp-orb-a{{position:absolute;width:700px;height:700px;
@@ -314,23 +303,6 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;
   line-height:1.7;margin-bottom:36px;font-weight:400}}
 .lp-cta-row{{display:flex;gap:14px;flex-wrap:wrap;align-items:center;
   margin-bottom:48px}}
-.lp-btn-primary{{display:inline-flex;align-items:center;gap:8px;
-  background:linear-gradient(135deg,#38bdf8,#818cf8);
-  color:#fff;border:none;border-radius:50px;
-  padding:15px 32px;font-size:15px;font-weight:700;
-  font-family:'Sora',sans-serif;cursor:pointer;letter-spacing:0.01em;
-  box-shadow:0 8px 30px rgba(56,189,248,0.35);
-  transition:transform .25s,box-shadow .25s;text-decoration:none}}
-.lp-btn-primary:hover{{transform:translateY(-3px);
-  box-shadow:0 14px 40px rgba(56,189,248,0.5)}}
-.lp-btn-ghost{{display:inline-flex;align-items:center;gap:8px;
-  background:transparent;color:rgba(255,255,255,0.75);
-  border:1.5px solid rgba(255,255,255,0.2);border-radius:50px;
-  padding:14px 28px;font-size:15px;font-weight:600;cursor:pointer;
-  letter-spacing:0.01em;transition:all .25s;text-decoration:none;
-  font-family:'Plus Jakarta Sans',sans-serif}}
-.lp-btn-ghost:hover{{background:rgba(255,255,255,0.07);
-  border-color:rgba(255,255,255,0.4);color:#fff}}
 .lp-stats{{display:flex;gap:40px;flex-wrap:wrap}}
 .lp-stat{{text-align:left}}
 .lp-stat-num{{font-family:'Sora',sans-serif;font-size:32px;font-weight:800;
@@ -403,9 +375,10 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;
   font-weight:800;color:{TX};letter-spacing:-0.02em;margin-bottom:12px}}
 .lp-cta-band-sub{{font-size:15px;color:{TX2};margin-bottom:28px}}
 
-/* Landing nav */
-.lp-nav{{background:{'rgba(8,12,20,0.85)' if D else 'rgba(240,244,248,0.85)'};
-  backdrop-filter:blur(16px);border-bottom:1px solid {BORDER};
+/* ── LANDING NAV — highlighted links ── */
+.lp-nav{{background:{'rgba(8,12,20,0.88)' if D else 'rgba(240,244,248,0.92)'};
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid {BORDER};
   position:sticky;top:0;z-index:200;padding:0 2rem}}
 .lp-nav-inner{{max-width:1300px;margin:0 auto;
   display:flex;align-items:center;justify-content:space-between;
@@ -414,12 +387,26 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;
   background:linear-gradient(135deg,{GRAD1},{GRAD2});
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   letter-spacing:-0.02em}}
-.lp-nav-links{{display:flex;gap:28px;align-items:center}}
-.lp-nav-link{{font-size:14px;font-weight:600;color:{TX2};
-  cursor:pointer;transition:color .2s;text-decoration:none}}
-.lp-nav-link:hover{{color:{AC}}}
+.lp-nav-links{{display:flex;gap:8px;align-items:center}}
+.lp-nav-link{{
+  font-size:13px;font-weight:600;color:{'rgba(255,255,255,0.72)' if D else TX2};
+  cursor:pointer;transition:all .2s;text-decoration:none;
+  padding:7px 16px;border-radius:50px;
+  border:1px solid transparent;
+  background:transparent;display:inline-block}}
+.lp-nav-link:hover{{
+  color:{AC}!important;
+  background:{ACBG}!important;
+  border-color:{AC}40!important;
+  text-decoration:none!important}}
 
-/* Stars decorative */
+/* Auth pages background — same depth as dark */
+.sv-auth-bg{{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:{'linear-gradient(135deg,#080c14 0%,#0f172a 50%,#080c14 100%)' if D else 'linear-gradient(135deg,#dbeafe 0%,#f0f4f8 50%,#e0f2fe 100%)'};
+  z-index:-1}}
+
+/* Stars & orbs for non-landing authenticated pages */
 .sv-stars{{position:fixed;top:0;left:0;right:0;bottom:0;
   background-image:
     radial-gradient(1px 1px at 20% 30%,{STAR} 0%,transparent 100%),
@@ -429,11 +416,11 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;
     radial-gradient(2px 2px at 70% 70%,{STAR} 0%,transparent 100%);
   pointer-events:none;z-index:0}}
 .sv-orb1{{position:fixed;width:600px;height:600px;
-  background:radial-gradient(circle,rgba(56,189,248,0.12) 0%,transparent 70%);
+  background:radial-gradient(circle,{ORB1_COLOR} 0%,transparent 70%);
   border-radius:50%;top:-200px;right:-100px;pointer-events:none;z-index:0;
   animation:orb-float 8s ease-in-out infinite}}
 .sv-orb2{{position:fixed;width:500px;height:500px;
-  background:radial-gradient(circle,rgba(129,140,248,0.10) 0%,transparent 70%);
+  background:radial-gradient(circle,{ORB2_COLOR} 0%,transparent 70%);
   border-radius:50%;bottom:-150px;left:-100px;pointer-events:none;z-index:0;
   animation:orb-float 10s ease-in-out infinite reverse}}
 @keyframes orb-float{{
@@ -441,10 +428,26 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;
   50%{{transform:translateY(-30px) scale(1.05)}}}}
 .sv-grid{{position:fixed;top:0;left:0;right:0;bottom:0;
   background-image:
-    linear-gradient({BORDER} 1px,transparent 1px),
-    linear-gradient(90deg,{BORDER} 1px,transparent 1px);
+    linear-gradient({GRID_COLOR} 1px,transparent 1px),
+    linear-gradient(90deg,{GRID_COLOR} 1px,transparent 1px);
   background-size:60px 60px;
-  opacity:{'0.12' if D else '0.06'};pointer-events:none;z-index:0}}
+  opacity:{GRID_OPACITY};pointer-events:none;z-index:0}}
+
+/* Theme toggle on auth/landing pages — transparent ghost style */
+.lp-theme-btn .stButton>button,
+.auth-theme-btn .stButton>button{{
+  background:{'rgba(255,255,255,0.08)' if D else 'rgba(0,0,0,0.06)'}!important;
+  border:1.5px solid {'rgba(255,255,255,0.18)' if D else 'rgba(0,0,0,0.14)'}!important;
+  border-radius:50px!important;
+  backdrop-filter:blur(8px)!important;
+  color:{'rgba(255,255,255,0.85)' if D else TX}!important;
+  box-shadow:none!important;
+  padding:7px 14px!important;
+  font-size:14px!important}}
+.lp-theme-btn .stButton>button:hover,
+.auth-theme-btn .stButton>button:hover{{
+  background:{'rgba(255,255,255,0.14)' if D else 'rgba(0,0,0,0.10)'}!important;
+  border-color:{AC}!important;transform:none!important}}
 </style>""", unsafe_allow_html=True)
 
     return dict(BG=BG,SURF=SURF,SURF2=SURF2,BORDER=BORDER,TX=TX,TX2=TX2,TX3=TX3,
@@ -452,9 +455,6 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;
                 RD=RD,RDBG=RDBG,GRAD1=GRAD1,GRAD2=GRAD2,D=D)
 
 
-# ─────────────────────────────────────────────
-# TOPBAR (authenticated pages)
-# ─────────────────────────────────────────────
 def topbar(t):
     db    = load_db()
     u     = st.session_state.user or ""
@@ -497,14 +497,13 @@ def inline_theme_toggle(t, key="theme_toggle"):
     theme_ico = "☀️" if st.session_state.dark else "🌙"
     _, rc = st.columns([9, 1])
     with rc:
+        st.markdown('<div class="auth-theme-btn">', unsafe_allow_html=True)
         if st.button(theme_ico, key=key, help="Toggle theme"):
             st.session_state.dark = not st.session_state.dark
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────
-# GRADE + SUGGESTIONS (emoji-free for PDF)
-# ─────────────────────────────────────────────
 def grade(s):
     if s >= 90: return "A+","Outstanding","sv-pill-g"
     if s >= 80: return "A", "Excellent",  "sv-pill-g"
@@ -540,9 +539,6 @@ def suggestions(score, inp):
     return tips
 
 
-# ─────────────────────────────────────────────
-# MATPLOTLIB CHARTS (for PDF embeds)
-# ─────────────────────────────────────────────
 def make_radar_bytes(inp):
     factor_map = {
         "Motivation":  {"Low":25,"Medium":60,"High":90},
@@ -584,10 +580,10 @@ def make_bar_bytes(inp):
         min(100,inp["Previous_Scores"]),
         min(100,inp["Sleep_Hours"]/8*100),
     ]
-    colors=["#047857" if v>=70 else ("#b45309" if v>=45 else "#b91c1c") for v in vals]
+    colors_list=["#047857" if v>=70 else ("#b45309" if v>=45 else "#b91c1c") for v in vals]
     fig,ax=plt.subplots(figsize=(5.5,3))
     ax.set_facecolor("#f7f9fc"); fig.patch.set_facecolor("#ffffff")
-    bars=ax.barh(labels,vals,color=colors,height=0.45,edgecolor="white")
+    bars=ax.barh(labels,vals,color=colors_list,height=0.45,edgecolor="white")
     for bar,val in zip(bars,vals):
         ax.text(bar.get_width()+1.2,bar.get_y()+bar.get_height()/2,
                 f"{val:.0f}%",va="center",ha="left",fontsize=9,color="#0f1c2e",fontweight="bold")
@@ -624,13 +620,10 @@ def make_gauge_bytes(score, prev):
     return buf.getvalue()
 
 
-# ─────────────────────────────────────────────
-# PDF GENERATOR — ReportLab (robust, A4)
-# ─────────────────────────────────────────────
 def generate_pdf(user_data, result, inp):
     buf = io.BytesIO()
-    W, H = A4           # 595.27 x 841.89 pt
-    MARGIN = 18*mm      # ~51pt each side → usable ≈ 493pt
+    W, H = A4
+    MARGIN = 18*mm
 
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -638,7 +631,6 @@ def generate_pdf(user_data, result, inp):
         topMargin=14*mm, bottomMargin=14*mm,
     )
 
-    # ── Colour palette ──
     C_BLUE   = colors.HexColor("#0284c7")
     C_BLUE2  = colors.HexColor("#6366f1")
     C_DARK   = colors.HexColor("#0f1c2e")
@@ -682,13 +674,10 @@ def generate_pdf(user_data, result, inp):
     g, desc, _ = grade(result["score"])
     score = result["score"]
     sugs  = suggestions(score, inp)
-    usable = W - 2*MARGIN          # points available between margins
+    usable = W - 2*MARGIN
 
     story = []
 
-    # ══════════════════════════════════════════
-    # PAGE 1 — COVER HEADER (drawn as table row)
-    # ══════════════════════════════════════════
     header_data = [[
         Paragraph("ScoreVision AI", S_TITLE),
         Paragraph(f"Performance Report<br/>"
@@ -708,7 +697,6 @@ def generate_pdf(user_data, result, inp):
     story.append(header_tbl)
     story.append(Spacer(1, 14))
 
-    # ── SCORE BOX ──
     score_color = C_GREEN if score>=70 else (C_ORANGE if score>=50 else C_RED)
     score_data = [[
         Paragraph(f"{score}", S_SCORE),
@@ -735,7 +723,6 @@ def generate_pdf(user_data, result, inp):
     story.append(score_tbl)
     story.append(Spacer(1, 14))
 
-    # ── STUDENT INFO ──
     story.append(Paragraph("Student Information", S_H1))
     story.append(HRFlowable(width="100%", thickness=1, color=C_BORDER, spaceAfter=6))
 
@@ -769,7 +756,6 @@ def generate_pdf(user_data, result, inp):
     story.append(info_tbl)
     story.append(Spacer(1, 14))
 
-    # ── INPUT PARAMETERS ──
     story.append(Paragraph("Prediction Parameters", S_H1))
     story.append(HRFlowable(width="100%", thickness=1, color=C_BORDER, spaceAfter=6))
 
@@ -810,7 +796,6 @@ def generate_pdf(user_data, result, inp):
     story.append(param_tbl)
     story.append(Spacer(1, 14))
 
-    # ── SUGGESTIONS ──
     story.append(Paragraph("Personalised Recommendations", S_H1))
     story.append(HRFlowable(width="100%", thickness=1, color=C_BORDER, spaceAfter=8))
 
@@ -827,9 +812,6 @@ def generate_pdf(user_data, result, inp):
     ]))
     story.append(sug_tbl)
 
-    # ══════════════════════════════════════════
-    # PAGE 2 — CHARTS
-    # ══════════════════════════════════════════
     story.append(PageBreak())
     story.append(Paragraph("Performance Charts", S_H1))
     story.append(HRFlowable(width="100%", thickness=1, color=C_BORDER, spaceAfter=10))
@@ -852,7 +834,6 @@ def generate_pdf(user_data, result, inp):
             story.append(Paragraph("(Chart could not be rendered)", S_BODY))
         story.append(Spacer(1, 16))
 
-    # ── Footer ──
     story.append(Spacer(1, 10))
     story.append(HRFlowable(width="100%", thickness=0.5, color=C_BORDER, spaceAfter=6))
     story.append(Paragraph(
@@ -864,33 +845,35 @@ def generate_pdf(user_data, result, inp):
 
 
 # ══════════════════════════════════════════════════════════════
-#                    PAGES
+#  PAGES
 # ══════════════════════════════════════════════════════════════
 
-# ── LANDING PAGE ───────────────────────────────────────────────
 def page_landing(t):
-    # ── Landing nav ──
     theme_ico = "☀️" if t["D"] else "🌙"
+
+    # Nav
     st.markdown(f"""
     <div class="lp-nav">
       <div class="lp-nav-inner">
         <div class="lp-nav-logo">🔭 ScoreVision AI</div>
         <div class="lp-nav-links">
-          <a class="lp-nav-link" href="#features">Features</a>
-          <a class="lp-nav-link" href="#how">How it Works</a>
-          <a class="lp-nav-link" href="#testimonials">Reviews</a>
+          <a class="lp-nav-link" href="#features">✦ Features</a>
+          <a class="lp-nav-link" href="#how">✦ How it Works</a>
+          <a class="lp-nav-link" href="#testimonials">✦ Reviews</a>
         </div>
       </div>
     </div>""", unsafe_allow_html=True)
 
-    # theme toggle top-right
+    # Theme toggle top-right — transparent style
     _, tr = st.columns([10, 1])
     with tr:
+        st.markdown('<div class="lp-theme-btn">', unsafe_allow_html=True)
         if st.button(theme_ico, key="lp_theme"):
             st.session_state.dark = not st.session_state.dark
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── HERO ──
+    # Hero
     st.markdown(f"""
     <div class="lp-hero">
       <div class="lp-stars"></div>
@@ -931,7 +914,7 @@ def page_landing(t):
       </div>
     </div>""", unsafe_allow_html=True)
 
-    # CTA buttons (Streamlit native so they work)
+    # CTA buttons
     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
     lc, mc, rc, _ = st.columns([1.2, 1.2, 1.2, 4])
     with lc:
@@ -944,7 +927,7 @@ def page_landing(t):
         if st.button("🔮 See a Demo", use_container_width=True):
             goto("login")
 
-    # ── FEATURES ──
+    # Features section
     st.markdown(f"""
     <div id="features" class="lp-section">
       <div class="lp-section-tag">Features</div>
@@ -981,7 +964,7 @@ def page_landing(t):
               <div class="lp-feat-desc">{desc}</div>
             </div>""", unsafe_allow_html=True)
 
-    # ── HOW IT WORKS ──
+    # How it works
     st.markdown(f"""
     <div id="how" class="lp-section">
       <div class="lp-section-tag">Process</div>
@@ -1030,11 +1013,11 @@ def page_landing(t):
           </div>
         </div>""", unsafe_allow_html=True)
 
-    # ── TESTIMONIALS ──
+    # Testimonials
     st.markdown(f"""
     <div id="testimonials" class="lp-section">
       <div class="lp-section-tag">Reviews</div>
-      <div class="lp-section-title">Trusted by students & parents</div>
+      <div class="lp-section-title">Trusted by students &amp; parents</div>
       <div class="lp-section-sub">
         Real feedback from the students and families who use ScoreVision AI every day.
       </div>
@@ -1048,8 +1031,8 @@ def page_landing(t):
         ("The radar chart showed me my peer influence was dragging me down. Changed my study group and improved by 14 points.",
          "Aarav K.", "Class 10, Bangalore"),
     ]
-    t1, t2, t3 = st.columns(3)
-    for col, (quote, name, role_str) in zip([t1, t2, t3], testis):
+    t1c, t2c, t3c = st.columns(3)
+    for col, (quote, name, role_str) in zip([t1c, t2c, t3c], testis):
         with col:
             st.markdown(f"""
             <div class="lp-testi">
@@ -1059,7 +1042,7 @@ def page_landing(t):
               <div class="lp-testi-role">{role_str}</div>
             </div>""", unsafe_allow_html=True)
 
-    # ── CTA BAND ──
+    # CTA band
     st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
     st.markdown(f"""
     <div class="lp-cta-band">
@@ -1084,9 +1067,10 @@ def page_landing(t):
     </div>""", unsafe_allow_html=True)
 
 
-# ── LOGIN ──────────────────────────────────────
 def page_login(t):
+    # Full-page background with orbs — works in both light and dark
     st.markdown("""
+    <div class="sv-auth-bg"></div>
     <div class="sv-stars"></div>
     <div class="sv-orb1"></div>
     <div class="sv-orb2"></div>
@@ -1103,13 +1087,15 @@ def page_login(t):
         background:linear-gradient(135deg,{t['GRAD1']},{t['GRAD2']});
         -webkit-background-clip:text;-webkit-text-fill-color:transparent;
         letter-spacing:-0.03em;line-height:1">ScoreVision AI</div>
-      <div style="font-size:14px;color:rgba(255,255,255,0.5);margin-top:10px;
-        letter-spacing:0.05em">AI-Powered Student Performance Prediction</div>
+      <div style="font-size:14px;color:{'rgba(255,255,255,0.5)' if t['D'] else t['TX2']};
+        margin-top:10px;letter-spacing:0.05em">AI-Powered Student Performance Prediction</div>
     </div>""", unsafe_allow_html=True)
 
     _, mc, _ = st.columns([1, 2, 1])
     with mc:
-        st.markdown('<div class="sv-auth">', unsafe_allow_html=True)
+        # Card using sv-card class (no blank box issue)
+        st.markdown(f'<div class="sv-card" style="border-radius:28px;padding:36px 40px;">', unsafe_allow_html=True)
+
         r1, r2 = st.columns(2)
         with r1:
             if st.button("🎓 Student", key="role_s", use_container_width=True):
@@ -1120,12 +1106,12 @@ def page_login(t):
 
         role_label = st.session_state.get("login_role", "Student")
         st.markdown(f"""
-        <div class="sv-auth-title">Welcome back, {role_label} 👋</div>
+        <div class="sv-auth-title" style="margin-top:20px">Welcome back, {role_label} 👋</div>
         <div class="sv-auth-sub">Sign in to access your ScoreVision dashboard</div>
         """, unsafe_allow_html=True)
 
         username = st.text_input("Username", placeholder="your_username", key="lu")
-        password = st.text_input("Password", type="password", placeholder="••••••••", key="lp")
+        password = st.text_input("Password", type="password", placeholder="••••••••", key="lp_pw")
 
         c1, c2 = st.columns(2)
         with c1:
@@ -1152,22 +1138,23 @@ def page_login(t):
         st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ── SIGNUP ─────────────────────────────────────
 def page_signup(t):
     st.markdown("""
+    <div class="sv-auth-bg"></div>
     <div class="sv-stars"></div>
     <div class="sv-orb1"></div>
     <div class="sv-orb2"></div>
+    <div class="sv-grid"></div>
     """, unsafe_allow_html=True)
 
     inline_theme_toggle(t, key="signup_theme")
 
-    st.markdown(f"""<div style="text-align:center;padding:36px 0 26px">
+    st.markdown(f"""<div style="text-align:center;padding:36px 0 26px;position:relative;z-index:1">
       <div style="font-family:'Sora',sans-serif;font-size:32px;font-weight:800;
         background:linear-gradient(135deg,{t['GRAD1']},{t['GRAD2']});
         -webkit-background-clip:text;-webkit-text-fill-color:transparent">
         Join ScoreVision AI</div>
-      <div style="color:rgba(255,255,255,0.45);font-size:14px;margin-top:6px">
+      <div style="color:{'rgba(255,255,255,0.45)' if t['D'] else t['TX2']};font-size:14px;margin-top:6px">
         Create your free account</div>
     </div>""", unsafe_allow_html=True)
 
@@ -1236,7 +1223,6 @@ def page_signup(t):
         st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ── DASHBOARD ──────────────────────────────────
 def page_dashboard(t):
     topbar(t)
     db    = load_db()
@@ -1272,7 +1258,8 @@ def page_dashboard(t):
     best = max((p["score"] for p in preds), default=0)
     last = preds[-1]["score"] if preds else 0
 
-    for col, (v, l) in zip(st.columns(4), [
+    tile_cols = st.columns(4)
+    for col, (v, l) in zip(tile_cols, [
         (len(preds),"Predictions Run"),(f"{avg}%","Average Score"),
         (f"{best}%","Personal Best"),(f"{last}%","Last Score"),
     ]):
@@ -1365,7 +1352,6 @@ def page_dashboard(t):
         st.dataframe(df_h, use_container_width=True, hide_index=True)
 
 
-# ── PREDICT ────────────────────────────────────
 def page_predict(t):
     topbar(t)
     st.markdown('<div class="sv-sh">🔮 Predict Your Score</div>'
@@ -1426,7 +1412,6 @@ def page_predict(t):
         goto("results")
 
 
-# ── RESULTS ────────────────────────────────────
 def page_results(t):
     topbar(t)
     if not st.session_state.result:
@@ -1532,10 +1517,10 @@ def page_results(t):
                     unsafe_allow_html=True)
         bv = [inp["Hours_Studied"]/8*100,inp["Attendance"],
               inp["Previous_Scores"],inp["Sleep_Hours"]/8*100]
-        bc = [t["GR"] if v>=70 else (t["GO"] if v>=45 else t["RD"]) for v in bv]
+        bc_list = [t["GR"] if v>=70 else (t["GO"] if v>=45 else t["RD"]) for v in bv]
         fig2 = go.Figure(go.Bar(
             x=["Study Hrs","Attendance","Prev Score","Sleep"],y=bv,
-            marker_color=bc,text=[f"{v:.0f}%" for v in bv],
+            marker_color=bc_list,text=[f"{v:.0f}%" for v in bv],
             textposition="outside",marker=dict(line=dict(width=0)),
         ))
         fig2.update_layout(
@@ -1595,7 +1580,7 @@ def page_results(t):
         st.dataframe(df_inp, use_container_width=True, hide_index=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f'<div class="sv-sh">Share & Download</div>'
+    st.markdown(f'<div class="sv-sh">Share &amp; Download</div>'
                 f'<div class="sv-ss">Export your full report or share on WhatsApp</div>',
                 unsafe_allow_html=True)
 
@@ -1638,7 +1623,7 @@ def page_results(t):
             padding:14px 28px;text-align:center;font-weight:700;font-size:14px;
             font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;
             box-shadow:0 4px 15px rgba(37,211,102,0.35);letter-spacing:0.02em">
-            Share on WhatsApp
+            📱 Share on WhatsApp
           </div>
         </a>
         <div style="text-align:center;font-size:12px;color:{t['TX3']};margin-top:8px">
@@ -1646,7 +1631,6 @@ def page_results(t):
         unsafe_allow_html=True)
 
 
-# ── PROFILE ────────────────────────────────────
 def page_profile(t):
     topbar(t)
     st.markdown('<div class="sv-sh">Edit Profile</div>'
