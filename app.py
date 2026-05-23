@@ -356,7 +356,7 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
 .lp-section-sub{{font-size:16px;color:{TX2};max-width:540px;line-height:1.6;margin-bottom:48px}}
 
 /* ── FEATURE CARDS ── */
-.lp-feat{{background:{SURF};border:1px solid {BORDER};border-radius:20px;padding:28px;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,{SHADOW});transition:transform .25s,box-shadow .25s;height:100%}}
+.lp-feat{{background:{SURF};border:1px solid {BORDER};border-radius:20px;padding:28px;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,{SHADOW});transition:transform .25s,box-shadow .25s;display:flex;flex-direction:column}}
 .lp-feat:hover{{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.18)}}
 .lp-feat::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,{GRAD1},{GRAD2})}}
 .lp-feat-icon{{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,{GRAD1}22,{GRAD2}22);border:1px solid {AC}30;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:18px}}
@@ -370,7 +370,7 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
 .lp-step-desc{{font-size:13px;color:{TX2};line-height:1.6}}
 
 /* ── TESTIMONIALS ── */
-.lp-testi{{background:{SURF};border:1px solid {BORDER};border-radius:18px;padding:24px;position:relative;box-shadow:0 4px 20px rgba(0,0,0,{SHADOW});height:100%}}
+.lp-testi{{background:{SURF};border:1px solid {BORDER};border-radius:18px;padding:24px;position:relative;box-shadow:0 4px 20px rgba(0,0,0,{SHADOW});display:flex;flex-direction:column}}
 .lp-testi-quote{{font-size:13px;color:{TX2};line-height:1.7;margin-bottom:16px;font-style:italic}}
 .lp-testi-name{{font-weight:700;font-size:13px;color:{TX}}}
 .lp-testi-role{{font-size:11px;color:{TX3}}}
@@ -776,17 +776,17 @@ def page_landing(t):
         ("💡","AI Recommendations","Context-aware improvement tips generated from your specific inputs — not generic advice. Study smarter, not harder."),
         ("🌙","Dark & Light Modes","A beautifully crafted interface that adapts to your preference, with smooth theme transitions and consistent design tokens."),
     ]
-    c1,c2,c3 = st.columns(3)
-    for i,(icon,title,desc) in enumerate(feats):
-        col = [c1,c2,c3][i%3]
-        with col:
-            st.markdown(f"""
-            <div class="lp-feat">
-              <div class="lp-feat-icon">{icon}</div>
-              <div class="lp-feat-title">{title}</div>
-              <div class="lp-feat-desc">{desc}</div>
-            </div>
-            <div style="height:16px"></div>""", unsafe_allow_html=True)
+    feat_cards_html = "".join(f"""
+        <div class="lp-feat">
+          <div class="lp-feat-icon">{icon}</div>
+          <div class="lp-feat-title">{title}</div>
+          <div class="lp-feat-desc">{desc}</div>
+        </div>""" for icon,title,desc in feats)
+    st.markdown(f"""
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+      padding:0 2rem 48px;max-width:1300px;margin:0 auto">
+      {feat_cards_html}
+    </div>""", unsafe_allow_html=True)
 
     # ── How it works ──
     st.markdown(f"""
@@ -838,16 +838,18 @@ def page_landing(t):
         ("As a parent, the PDF report gave me a clear picture of where my son needs help. Game changer.","Rajesh M.","Parent, Mumbai"),
         ("The radar chart showed me my peer influence was dragging me down. Changed my study group and improved by 14 points.","Aarav K.","Class 10, Bangalore"),
     ]
-    t1c,t2c,t3c = st.columns(3)
-    for col,(quote,name,role_str) in zip([t1c,t2c,t3c],testis):
-        with col:
-            st.markdown(f"""
-            <div class="lp-testi">
-              <div style="font-size:24px;color:{t['GRAD1']};margin-bottom:10px">"</div>
-              <div class="lp-testi-quote">{quote}</div>
-              <div class="lp-testi-name">{name}</div>
-              <div class="lp-testi-role">{role_str}</div>
-            </div>""", unsafe_allow_html=True)
+    testi_cards_html = "".join(f"""
+        <div class="lp-testi">
+          <div style="font-size:24px;color:{t['GRAD1']};margin-bottom:10px">"</div>
+          <div class="lp-testi-quote">{quote}</div>
+          <div class="lp-testi-name">{name}</div>
+          <div class="lp-testi-role">{role_str}</div>
+        </div>""" for quote,name,role_str in testis)
+    st.markdown(f"""
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+      padding:0 2rem 48px;max-width:1300px;margin:0 auto">
+      {testi_cards_html}
+    </div>""", unsafe_allow_html=True)
 
     # ── CTA band ──
     st.markdown("<div style='height:48px'></div>", unsafe_allow_html=True)
