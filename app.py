@@ -70,40 +70,42 @@ def apply_theme():
         RD="#f87171"; RDBG="#1a0505"; INP="#0c1520"
         GRAD1="#38bdf8"; GRAD2="#818cf8"
         HERO="linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)"
-        STAR="rgba(255,255,255,0.06)"
         NAV_BG="rgba(8,12,20,0.92)"
         NAV_LINK="rgba(255,255,255,0.72)"
         AUTH_HERO="linear-gradient(135deg,#080c14 0%,#0f172a 50%,#080c14 100%)"
-        CARD_TITLE_COLOR=TX
-        INPUT_LABEL=TX2
         THEME_BTN_BG="rgba(255,255,255,0.08)"
         THEME_BTN_BORDER="rgba(255,255,255,0.18)"
         THEME_BTN_COLOR="rgba(255,255,255,0.85)"
         ORB1="rgba(56,189,248,0.12)"
         ORB2="rgba(129,140,248,0.10)"
+        GRID_COLOR="rgba(56,189,248,0.04)"
         GRID_OPACITY="0.12"
+        # Auth page background (dark)
+        AUTH_BG_MAIN="#080c14"
+        AUTH_BG_MID="#0f172a"
     else:
-        BG="#f0f4f8"; SURF="#ffffff"; SURF2="#f7f9fc"; BORDER="#dce4ef"
+        BG="#eef2f7"; SURF="#ffffff"; SURF2="#f0f4fa"; BORDER="#d0daea"
         TX="#0f1c2e"; TX2="#4a6080"; TX3="#8aa0be"
-        AC="#0284c7"; AC2="#6366f1"; ACBG="#e0f2fe"
+        AC="#0284c7"; AC2="#6366f1"; ACBG="#dbeafe"
         GR="#059669"; GRBG="#d1fae5"; GO="#d97706"; GOBG="#fef3c7"
         RD="#dc2626"; RDBG="#fee2e2"; INP="#ffffff"
         GRAD1="#0284c7"; GRAD2="#6366f1"
         HERO="linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%)"
-        STAR="rgba(255,255,255,0.05)"
-        NAV_BG="rgba(240,244,248,0.96)"
+        NAV_BG="rgba(238,242,247,0.96)"
         NAV_LINK=TX2
-        AUTH_HERO="linear-gradient(135deg,#dbeafe 0%,#f0f4f8 50%,#e0f2fe 100%)"
-        CARD_TITLE_COLOR=TX
-        INPUT_LABEL=TX2
+        AUTH_HERO="linear-gradient(135deg,#1e3a5f 0%,#0f172a 50%,#1a1b4b 100%)"
         THEME_BTN_BG="rgba(0,0,0,0.05)"
         THEME_BTN_BORDER="rgba(0,0,0,0.14)"
         THEME_BTN_COLOR=TX
-        ORB1="rgba(2,132,199,0.08)"
-        ORB2="rgba(99,102,241,0.06)"
-        GRID_OPACITY="0.20"
+        ORB1="rgba(2,132,199,0.18)"
+        ORB2="rgba(99,102,241,0.14)"
+        GRID_COLOR="rgba(56,189,248,0.07)"
+        GRID_OPACITY="0.35"
+        # Auth page background — same dark as dark mode for light theme too
+        AUTH_BG_MAIN="#0f172a"
+        AUTH_BG_MID="#1e3a5f"
 
-    SHADOW = "0.2" if D else "0.06"
+    SHADOW = "0.18" if D else "0.07"
 
     st.markdown(f"""<style>
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -118,6 +120,23 @@ html,body,[class*="css"]{{
 #MainMenu,footer,header{{visibility:hidden!important}}
 .stDeployButton{{display:none!important}}
 
+/* ── KILL ALL BLANK BOXES ──
+   Streamlit wraps every st.markdown in a div[data-testid="stMarkdownContainer"]
+   and every st.columns child in div[data-testid="column"].
+   Empty Streamlit element containers produce visible white boxes when
+   background differs from surface. We zero them out entirely. */
+[data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stVerticalBlockBorderWrapper"]{{
+  background:transparent!important;
+  border:none!important;
+  box-shadow:none!important;
+  padding:0!important}}
+/* Hide any truly empty stMarkdownContainer divs */
+[data-testid="stMarkdownContainer"]:empty{{display:none!important}}
+/* The main culprit — Streamlit st.container() adds a wrapper with its own bg */
+[data-testid="stVerticalBlock"]>[data-testid="element-container"]:has(>[data-testid="stMarkdownContainer"]:empty){{
+  display:none!important}}
+
 /* ── SIDEBAR ── */
 section[data-testid="stSidebar"]{{background:{SURF}!important;border-right:1px solid {BORDER}!important}}
 
@@ -125,23 +144,68 @@ section[data-testid="stSidebar"]{{background:{SURF}!important;border-right:1px s
 ::-webkit-scrollbar{{width:6px}}
 ::-webkit-scrollbar-thumb{{background:{BORDER};border-radius:10px}}
 
-/* ── INPUTS ── */
+/* ── INPUTS — force correct theme colours ── */
 .stTextInput>div>div>input,
 .stNumberInput>div>div>input,
 .stTextArea textarea,
 .stDateInput>div>div>input{{
-  background:{INP}!important;color:{TX}!important;
-  border:1.5px solid {BORDER}!important;border-radius:12px!important;
+  background:{INP}!important;
+  color:{TX}!important;
+  border:1.5px solid {BORDER}!important;
+  border-radius:12px!important;
   font-family:'Plus Jakarta Sans',sans-serif!important;
-  font-size:14px!important;padding:10px 14px!important}}
+  font-size:14px!important;
+  padding:10px 14px!important;
+  -webkit-text-fill-color:{TX}!important}}
+.stTextInput>div>div>input::placeholder,
+.stNumberInput>div>div>input::placeholder,
+.stTextArea textarea::placeholder{{
+  color:{TX3}!important;
+  -webkit-text-fill-color:{TX3}!important}}
 .stTextInput>div>div>input:focus,
 .stNumberInput>div>div>input:focus{{
-  border-color:{AC}!important;box-shadow:0 0 0 3px {ACBG}!important}}
-.stSelectbox>div>div{{
-  background:{INP}!important;color:{TX}!important;
-  border:1.5px solid {BORDER}!important;border-radius:12px!important}}
-.stSelectbox>div>div>div{{color:{TX}!important}}
-/* ALL labels visible in both themes */
+  border-color:{AC}!important;
+  box-shadow:0 0 0 3px {ACBG}!important}}
+
+/* Selectbox */
+.stSelectbox>div>div,
+[data-baseweb="select"]>div{{
+  background:{INP}!important;
+  color:{TX}!important;
+  border:1.5px solid {BORDER}!important;
+  border-radius:12px!important}}
+[data-baseweb="select"] *,
+[data-baseweb="select"] span,
+[data-baseweb="select"] div{{
+  color:{TX}!important;
+  background:transparent!important}}
+/* Selectbox dropdown menu */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[role="listbox"],
+[role="option"]{{
+  background:{SURF}!important;
+  color:{TX}!important;
+  border:1px solid {BORDER}!important}}
+[role="option"]:hover{{background:{SURF2}!important}}
+
+/* Number input */
+.stNumberInput>div>div{{
+  background:{INP}!important;
+  border:1.5px solid {BORDER}!important;
+  border-radius:12px!important}}
+.stNumberInput button{{
+  color:{TX}!important;
+  background:{SURF2}!important;
+  border-color:{BORDER}!important}}
+
+/* Date input */
+.stDateInput>div>div{{
+  background:{INP}!important;
+  border:1.5px solid {BORDER}!important;
+  border-radius:12px!important}}
+
+/* ALL labels */
 label,
 .stSelectbox label,
 .stTextInput label,
@@ -151,16 +215,19 @@ label,
 .stFileUploader label,
 [data-testid="stWidgetLabel"] p,
 [data-testid="stWidgetLabel"] span{{
-  color:{TX}!important;font-size:13px!important;font-weight:600!important;
+  color:{TX}!important;
+  font-size:13px!important;
+  font-weight:600!important;
   letter-spacing:0.03em!important}}
 /* Radio option text */
 .stRadio [data-testid="stMarkdownContainer"] p{{color:{TX}!important}}
-/* Selectbox dropdown text */
-[data-baseweb="select"] [data-testid="stMarkdownContainer"]{{color:{TX}!important}}
-/* Number input stepper buttons */
-.stNumberInput button{{color:{TX}!important;background:{SURF2}!important;border-color:{BORDER}!important}}
 /* File uploader text */
 .stFileUploader [data-testid="stMarkdownContainer"] p{{color:{TX2}!important}}
+/* File uploader box */
+[data-testid="stFileUploader"]>section{{
+  background:{SURF2}!important;
+  border:1.5px dashed {BORDER}!important;
+  border-radius:12px!important}}
 
 /* ── DEFAULT BUTTONS ── */
 .stButton>button{{
@@ -235,14 +302,11 @@ label,
   margin-bottom:12px;font-size:14px;color:{TX};
   box-shadow:0 2px 8px rgba(0,0,0,{SHADOW})}}
 
-/* ── AUTH PAGE TEXT ── */
+/* ── AUTH CARD TEXT ── */
 .sv-auth-title{{
   font-family:'Sora',sans-serif;font-size:26px;font-weight:800;
-  color:{TX}!important;margin-bottom:6px;letter-spacing:-0.02em}}
-.sv-auth-sub{{font-size:14px;color:{TX2}!important;margin-bottom:28px}}
-/* Force text visibility inside auth cards */
-.sv-auth-card *{{color:{TX}!important}}
-.sv-auth-card p,.sv-auth-card span,.sv-auth-card div{{color:{TX}!important}}
+  color:#ffffff!important;margin-bottom:6px;letter-spacing:-0.02em}}
+.sv-auth-sub{{font-size:14px;color:rgba(255,255,255,0.65)!important;margin-bottom:28px}}
 
 /* ── TOPBAR ── */
 .sv-topbar-wrap{{
@@ -293,7 +357,7 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
 .lp-nav{{
   background:{NAV_BG};
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  border-bottom:1px solid {BORDER};
+  border-bottom:1px solid rgba(255,255,255,0.08);
   position:sticky;top:0;z-index:200;padding:0 2rem}}
 .lp-nav-inner{{
   max-width:1300px;margin:0 auto;
@@ -306,13 +370,13 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
   letter-spacing:-0.02em}}
 .lp-nav-links{{display:flex;gap:8px;align-items:center}}
 .lp-nav-link{{
-  font-size:13px;font-weight:600;color:{NAV_LINK};
+  font-size:13px;font-weight:600;color:rgba(255,255,255,0.72);
   cursor:pointer;transition:all .2s;text-decoration:none;
   padding:7px 16px;border-radius:50px;
   border:1px solid transparent;background:transparent;display:inline-block}}
 .lp-nav-link:hover{{
-  color:{AC}!important;background:{ACBG}!important;
-  border-color:{AC}40!important;text-decoration:none!important}}
+  color:#38bdf8!important;background:rgba(56,189,248,0.10)!important;
+  border-color:rgba(56,189,248,0.35)!important;text-decoration:none!important}}
 
 /* ── HERO ── */
 .lp-hero{{
@@ -326,11 +390,7 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
     radial-gradient(1px 1px at 75% 12%,rgba(255,255,255,0.06) 0%,transparent 100%),
     radial-gradient(2px 2px at 50% 65%,rgba(255,255,255,0.07) 0%,transparent 100%),
     radial-gradient(1px 1px at 8% 80%,rgba(255,255,255,0.05) 0%,transparent 100%),
-    radial-gradient(1.5px 1.5px at 88% 45%,rgba(255,255,255,0.08) 0%,transparent 100%),
-    radial-gradient(1px 1px at 35% 10%,rgba(255,255,255,0.06) 0%,transparent 100%),
-    radial-gradient(2px 2px at 65% 88%,rgba(255,255,255,0.07) 0%,transparent 100%),
-    radial-gradient(1px 1px at 92% 72%,rgba(255,255,255,0.05) 0%,transparent 100%),
-    radial-gradient(1.5px 1.5px at 22% 55%,rgba(255,255,255,0.06) 0%,transparent 100%);
+    radial-gradient(1.5px 1.5px at 88% 45%,rgba(255,255,255,0.08) 0%,transparent 100%);
   pointer-events:none;animation:twinkle 4s ease-in-out infinite alternate}}
 @keyframes twinkle{{0%{{opacity:0.6}}100%{{opacity:1}}}}
 .lp-orb-a{{position:absolute;width:700px;height:700px;background:radial-gradient(circle,rgba(56,189,248,0.15) 0%,transparent 65%);border-radius:50%;top:-250px;right:-200px;pointer-events:none;animation:lp-float 9s ease-in-out infinite}}
@@ -348,6 +408,26 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
 .lp-stat{{text-align:left}}
 .lp-stat-num{{font-family:'Sora',sans-serif;font-size:32px;font-weight:800;background:linear-gradient(135deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}}
 .lp-stat-label{{font-size:12px;color:rgba(255,255,255,0.45);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;margin-top:2px}}
+
+/* ── CTA BUTTONS ROW (landing page) ── */
+.lp-cta-row{{
+  display:flex;gap:14px;flex-wrap:wrap;
+  align-items:center;margin-top:0;margin-bottom:0}}
+.lp-cta-btn{{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:14px 28px;border-radius:50px;font-family:'Sora',sans-serif;
+  font-size:14px;font-weight:700;letter-spacing:0.02em;
+  cursor:pointer;text-decoration:none;border:none;
+  transition:transform .2s,box-shadow .2s;white-space:nowrap}}
+.lp-cta-btn-primary{{
+  background:linear-gradient(135deg,#38bdf8,#818cf8);color:#fff;
+  box-shadow:0 6px 20px rgba(56,189,248,0.35)}}
+.lp-cta-btn-primary:hover{{transform:translateY(-2px);box-shadow:0 10px 28px rgba(56,189,248,0.45);color:#fff;text-decoration:none}}
+.lp-cta-btn-secondary{{
+  background:rgba(255,255,255,0.10);color:#fff;
+  border:1.5px solid rgba(255,255,255,0.22) !important;
+  backdrop-filter:blur(8px)}}
+.lp-cta-btn-secondary:hover{{background:rgba(255,255,255,0.18);color:#fff;text-decoration:none;transform:translateY(-2px)}}
 
 /* ── LANDING SECTIONS ── */
 .lp-section{{padding:60px 2rem;max-width:1300px;margin:0 auto}}
@@ -381,50 +461,90 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
 .lp-cta-band-title{{font-family:'Sora',sans-serif;font-size:clamp(24px,3vw,40px);font-weight:800;color:{TX};letter-spacing:-0.02em;margin-bottom:12px}}
 .lp-cta-band-sub{{font-size:15px;color:{TX2};margin-bottom:28px}}
 
-/* ── AUTH BACKGROUND ── */
-.sv-auth-bg{{position:fixed;top:0;left:0;right:0;bottom:0;background:{AUTH_HERO};z-index:-1}}
-.sv-stars{{position:fixed;top:0;left:0;right:0;bottom:0;background-image:radial-gradient(1px 1px at 20% 30%,rgba(255,255,255,0.06) 0%,transparent 100%),radial-gradient(1px 1px at 80% 10%,rgba(255,255,255,0.06) 0%,transparent 100%),radial-gradient(1.5px 1.5px at 50% 60%,rgba(255,255,255,0.07) 0%,transparent 100%),radial-gradient(1px 1px at 10% 80%,rgba(255,255,255,0.05) 0%,transparent 100%),radial-gradient(2px 2px at 70% 70%,rgba(255,255,255,0.07) 0%,transparent 100%);pointer-events:none;z-index:0}}
-.sv-orb1{{position:fixed;width:600px;height:600px;background:radial-gradient(circle,{ORB1} 0%,transparent 70%);border-radius:50%;top:-200px;right:-100px;pointer-events:none;z-index:0;animation:orb-float 8s ease-in-out infinite}}
-.sv-orb2{{position:fixed;width:500px;height:500px;background:radial-gradient(circle,{ORB2} 0%,transparent 70%);border-radius:50%;bottom:-150px;left:-100px;pointer-events:none;z-index:0;animation:orb-float 10s ease-in-out infinite reverse}}
+/* ── AUTH BACKGROUND (always dark/dramatic — same in both themes) ── */
+.sv-auth-bg{{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(135deg,{AUTH_BG_MAIN} 0%,{AUTH_BG_MID} 50%,{AUTH_BG_MAIN} 100%);
+  z-index:-1}}
+.sv-stars{{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%,rgba(255,255,255,0.08) 0%,transparent 100%),
+    radial-gradient(1px 1px at 80% 10%,rgba(255,255,255,0.08) 0%,transparent 100%),
+    radial-gradient(1.5px 1.5px at 50% 60%,rgba(255,255,255,0.07) 0%,transparent 100%),
+    radial-gradient(1px 1px at 10% 80%,rgba(255,255,255,0.07) 0%,transparent 100%),
+    radial-gradient(2px 2px at 70% 70%,rgba(255,255,255,0.07) 0%,transparent 100%),
+    radial-gradient(1px 1px at 30% 50%,rgba(255,255,255,0.06) 0%,transparent 100%),
+    radial-gradient(1.5px 1.5px at 60% 25%,rgba(255,255,255,0.08) 0%,transparent 100%);
+  pointer-events:none;z-index:0;
+  animation:twinkle 4s ease-in-out infinite alternate}}
+.sv-orb1{{
+  position:fixed;width:600px;height:600px;
+  background:radial-gradient(circle,rgba(56,189,248,0.16) 0%,transparent 70%);
+  border-radius:50%;top:-200px;right:-100px;pointer-events:none;z-index:0;
+  animation:orb-float 8s ease-in-out infinite}}
+.sv-orb2{{
+  position:fixed;width:500px;height:500px;
+  background:radial-gradient(circle,rgba(129,140,248,0.13) 0%,transparent 70%);
+  border-radius:50%;bottom:-150px;left:-100px;pointer-events:none;z-index:0;
+  animation:orb-float 10s ease-in-out infinite reverse}}
 @keyframes orb-float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-30px) scale(1.05)}}}}
-.sv-grid{{position:fixed;top:0;left:0;right:0;bottom:0;background-image:linear-gradient({BORDER} 1px,transparent 1px),linear-gradient(90deg,{BORDER} 1px,transparent 1px);background-size:60px 60px;opacity:{GRID_OPACITY};pointer-events:none;z-index:0}}
+.sv-grid{{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background-image:
+    linear-gradient(rgba(56,189,248,0.06) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(56,189,248,0.06) 1px,transparent 1px);
+  background-size:60px 60px;
+  opacity:0.5;pointer-events:none;z-index:0}}
 
-/* ── AUTH CARD (no blank box) ── */
+/* ── AUTH CARD ── */
 .sv-auth-card-wrap{{
   position:relative;z-index:10;
-  background:{SURF};
-  border:1px solid {BORDER};
+  background:rgba(15,21,32,0.82);
+  border:1px solid rgba(56,189,248,0.18);
   border-radius:28px;
   padding:36px 40px;
-  box-shadow:0 8px 40px rgba(0,0,0,{SHADOW})}}
-/* Force all text inside auth card to be visible */
-.sv-auth-card-wrap *,
-.sv-auth-card-wrap p,
-.sv-auth-card-wrap span,
+  box-shadow:0 8px 40px rgba(0,0,0,0.5);
+  backdrop-filter:blur(16px)}}
+/* All text inside auth card is white/light — always */
 .sv-auth-card-wrap label,
-.sv-auth-card-wrap div{{color:{TX}!important}}
-.sv-auth-card-wrap .sv-auth-sub{{color:{TX2}!important}}
-/* Override only gradient text */
-.sv-auth-card-wrap .sv-auth-title{{
-  background:none!important;
-  -webkit-text-fill-color:{TX}!important;
-  color:{TX}!important}}
+.sv-auth-card-wrap [data-testid="stWidgetLabel"] p,
+.sv-auth-card-wrap [data-testid="stWidgetLabel"] span{{
+  color:rgba(255,255,255,0.85)!important}}
+.sv-auth-card-wrap .stTextInput>div>div>input,
+.sv-auth-card-wrap .stNumberInput>div>div>input,
+.sv-auth-card-wrap .stTextArea textarea{{
+  background:rgba(255,255,255,0.07)!important;
+  color:#ffffff!important;
+  -webkit-text-fill-color:#ffffff!important;
+  border:1.5px solid rgba(255,255,255,0.15)!important}}
+.sv-auth-card-wrap .stTextInput>div>div>input::placeholder{{
+  color:rgba(255,255,255,0.35)!important;
+  -webkit-text-fill-color:rgba(255,255,255,0.35)!important}}
+.sv-auth-card-wrap .stTextInput>div>div>input:focus{{
+  border-color:rgba(56,189,248,0.6)!important;
+  box-shadow:0 0 0 3px rgba(56,189,248,0.15)!important}}
+.sv-auth-card-wrap .stRadio [data-testid="stMarkdownContainer"] p{{
+  color:rgba(255,255,255,0.85)!important}}
+.sv-auth-card-wrap p,
+.sv-auth-card-wrap span:not([class]){{color:rgba(255,255,255,0.7)!important}}
 
 /* ── THEME TOGGLE BUTTON (landing/auth) ── */
 .lp-theme-btn .stButton>button,
 .auth-theme-btn .stButton>button{{
-  background:{THEME_BTN_BG}!important;
-  border:1.5px solid {THEME_BTN_BORDER}!important;
+  background:rgba(255,255,255,0.10)!important;
+  border:1.5px solid rgba(255,255,255,0.22)!important;
   border-radius:50px!important;
   backdrop-filter:blur(8px)!important;
-  color:{THEME_BTN_COLOR}!important;
+  color:rgba(255,255,255,0.85)!important;
   box-shadow:none!important;
   padding:7px 14px!important;
   font-size:14px!important;
   transform:none!important}}
 .lp-theme-btn .stButton>button:hover,
 .auth-theme-btn .stButton>button:hover{{
-  border-color:{AC}!important;transform:none!important}}
+  border-color:rgba(56,189,248,0.6)!important;
+  transform:none!important}}
 
 /* ── DATAFRAME ── */
 [data-testid="stDataFrame"]{{border-radius:12px;overflow:hidden}}
@@ -433,7 +553,9 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
 
 /* ── EXPANDER ── */
 .streamlit-expanderHeader{{color:{TX}!important;font-weight:600!important}}
-.streamlit-expanderContent{{background:{SURF2}!important;border:1px solid {BORDER}!important;border-radius:0 0 12px 12px!important}}
+.streamlit-expanderContent{{
+  background:{SURF2}!important;border:1px solid {BORDER}!important;
+  border-radius:0 0 12px 12px!important}}
 
 /* ── FORM SUBMIT BUTTON ── */
 [data-testid="stFormSubmitButton"]>button{{
@@ -444,8 +566,15 @@ hr.sv-e{{border:none;border-top:1px solid {BORDER};margin:20px 0}}
   width:100%!important;margin-top:8px!important;
   box-shadow:0 4px 18px rgba(0,0,0,0.2)!important}}
 
-/* ── MARKDOWN HEADINGS INSIDE CARDS ── */
-.sv-card h4, .sv-card h3, .sv-card h2{{color:{TX}!important}}
+/* ── MARKDOWN HEADINGS ── */
+.sv-card h4,.sv-card h3,.sv-card h2{{color:{TX}!important}}
+
+/* ── STREAMLIT SUCCESS/ERROR/WARNING ── */
+[data-testid="stAlert"]{{border-radius:12px!important}}
+
+/* ── Plotly chart backgrounds ── */
+[data-testid="stPlotlyChart"]{{background:transparent!important}}
+
 </style>""", unsafe_allow_html=True)
 
     return dict(BG=BG,SURF=SURF,SURF2=SURF2,BORDER=BORDER,TX=TX,TX2=TX2,TX3=TX3,
@@ -700,7 +829,7 @@ def generate_pdf(user_data, result, inp):
 def page_landing(t):
     theme_ico = "☀️" if t["D"] else "🌙"
 
-    # ── Nav (pure HTML, no Streamlit columns to avoid blank boxes) ──
+    # ── Nav ──
     st.markdown(f"""
     <div class="lp-nav">
       <div class="lp-nav-inner">
@@ -713,7 +842,7 @@ def page_landing(t):
       </div>
     </div>""", unsafe_allow_html=True)
 
-    # Theme toggle — top right
+    # Theme toggle
     _, tr = st.columns([10,1])
     with tr:
         st.markdown('<div class="lp-theme-btn">', unsafe_allow_html=True)
@@ -721,7 +850,7 @@ def page_landing(t):
             st.session_state.dark = not st.session_state.dark; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Hero ──
+    # ── Hero with CTA buttons embedded in HTML (no Streamlit columns = no blank boxes) ──
     st.markdown(f"""
     <div class="lp-hero">
       <div class="lp-stars"></div>
@@ -739,17 +868,24 @@ def page_landing(t):
           ScoreVision AI uses machine learning trained on thousands of students to forecast your performance
           and give you a personalised improvement roadmap — in seconds.
         </div>
-        <div class="lp-stats">
+        <div class="lp-stats" style="margin-bottom:36px">
           <div class="lp-stat"><div class="lp-stat-num">95%</div><div class="lp-stat-label">Prediction Accuracy</div></div>
           <div class="lp-stat"><div class="lp-stat-num">10K+</div><div class="lp-stat-label">Students Helped</div></div>
           <div class="lp-stat"><div class="lp-stat-num">14</div><div class="lp-stat-label">Key Factors Analysed</div></div>
         </div>
+        <div class="lp-cta-row">
+          <a class="lp-cta-btn lp-cta-btn-primary" onclick="
+            window.parent.postMessage({{type:'streamlit:setComponentValue',value:'signup'}},'*');
+          " href="#">🚀 Get Started Free</a>
+          <a class="lp-cta-btn lp-cta-btn-secondary" href="#">🔑 Sign In</a>
+          <a class="lp-cta-btn lp-cta-btn-secondary" href="#">🔮 See a Demo</a>
+        </div>
       </div>
     </div>""", unsafe_allow_html=True)
 
-    # ── CTA buttons (below hero, no extra spacer div causing blank box) ──
-    st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
-    lc, mc, rc, _ = st.columns([1.2,1.2,1.2,4])
+    # Actual Streamlit buttons for navigation (hidden visually, shown below hero area)
+    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+    lc, mc, rc, _ = st.columns([1.2, 1.2, 1.2, 4])
     with lc:
         if st.button("🚀 Get Started Free", use_container_width=True, key="lp_signup"):
             goto("signup")
@@ -869,6 +1005,7 @@ def page_landing(t):
 
 
 def page_login(t):
+    # Full-page dark dramatic background (same in both themes)
     st.markdown("""
     <div class="sv-auth-bg"></div>
     <div class="sv-stars"></div>
@@ -883,56 +1020,54 @@ def page_login(t):
     <div style="text-align:center;padding:40px 0 28px;position:relative;z-index:1">
       <div style="font-size:52px;margin-bottom:12px;filter:drop-shadow(0 0 28px rgba(56,189,248,0.4))">🔭</div>
       <div style="font-family:'Sora',sans-serif;font-size:38px;font-weight:800;
-        background:linear-gradient(135deg,{t['GRAD1']},{t['GRAD2']});
+        background:linear-gradient(135deg,#38bdf8,#818cf8);
         -webkit-background-clip:text;-webkit-text-fill-color:transparent;
         letter-spacing:-0.03em;line-height:1">ScoreVision AI</div>
-      <div style="font-size:14px;color:{t['TX2']};margin-top:10px;letter-spacing:0.05em">AI-Powered Student Performance Prediction</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.55);margin-top:10px;letter-spacing:0.05em">AI-Powered Student Performance Prediction</div>
     </div>""", unsafe_allow_html=True)
 
     _,mc,_ = st.columns([1,2,1])
     with mc:
-        # Use native Streamlit elements — no HTML wrapper that causes blank box
-        with st.container():
-            st.markdown('<div class="sv-auth-card-wrap">', unsafe_allow_html=True)
+        st.markdown('<div class="sv-auth-card-wrap">', unsafe_allow_html=True)
 
-            r1,r2 = st.columns(2)
-            with r1:
-                if st.button("🎓 Student", key="role_s", use_container_width=True):
-                    st.session_state.login_role = "Student"; st.rerun()
-            with r2:
-                if st.button("👨‍👩‍👦 Parent", key="role_p", use_container_width=True):
-                    st.session_state.login_role = "Parent"; st.rerun()
+        r1,r2 = st.columns(2)
+        with r1:
+            if st.button("🎓 Student", key="role_s", use_container_width=True):
+                st.session_state.login_role = "Student"; st.rerun()
+        with r2:
+            if st.button("👨‍👩‍👦 Parent", key="role_p", use_container_width=True):
+                st.session_state.login_role = "Parent"; st.rerun()
 
-            role_label = st.session_state.get("login_role","Student")
-            st.markdown(f"""
-            <div class="sv-auth-title" style="margin-top:20px">Welcome back, {role_label} 👋</div>
-            <div class="sv-auth-sub">Sign in to access your ScoreVision dashboard</div>
-            """, unsafe_allow_html=True)
+        role_label = st.session_state.get("login_role","Student")
+        st.markdown(f"""
+        <div class="sv-auth-title" style="margin-top:20px">Welcome back, {role_label} 👋</div>
+        <div class="sv-auth-sub">Sign in to access your ScoreVision dashboard</div>
+        """, unsafe_allow_html=True)
 
-            username = st.text_input("Username", placeholder="your_username", key="lu")
-            password = st.text_input("Password", type="password", placeholder="••••••••", key="lp_pw")
+        username = st.text_input("Username", placeholder="your_username", key="lu")
+        password = st.text_input("Password", type="password", placeholder="••••••••", key="lp_pw")
 
-            c1,c2 = st.columns(2)
-            with c1:
-                if st.button("🚀 Sign In", use_container_width=True):
-                    db = load_db()
-                    if username in db and db[username]["password"] == hash_pw(password):
-                        st.session_state.logged_in = True
-                        st.session_state.user = username
-                        goto("dashboard")
-                    else:
-                        st.error("Incorrect username or password.")
-            with c2:
-                if st.button("📝 Register", use_container_width=True):
-                    goto("signup")
+        c1,c2 = st.columns(2)
+        with c1:
+            if st.button("🚀 Sign In", use_container_width=True):
+                db = load_db()
+                if username in db and db[username]["password"] == hash_pw(password):
+                    st.session_state.logged_in = True
+                    st.session_state.user = username
+                    goto("dashboard")
+                else:
+                    st.error("Incorrect username or password.")
+        with c2:
+            if st.button("📝 Register", use_container_width=True):
+                goto("signup")
 
-            st.markdown(f"<hr class='sv-e'>", unsafe_allow_html=True)
-            col_back,_ = st.columns([1,2])
-            with col_back:
-                if st.button("← Back to Home"):
-                    goto("landing")
-            st.markdown(f'<div style="text-align:center;font-size:12px;color:{t["TX3"]};margin-top:8px">Protected by end-to-end encryption &bull; Your data is safe</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(f"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.12);margin:20px 0'>", unsafe_allow_html=True)
+        col_back,_ = st.columns([1,2])
+        with col_back:
+            if st.button("← Back to Home"):
+                goto("landing")
+        st.markdown(f'<div style="text-align:center;font-size:12px;color:rgba(255,255,255,0.3);margin-top:8px">Protected by end-to-end encryption &bull; Your data is safe</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 def page_signup(t):
@@ -949,9 +1084,9 @@ def page_signup(t):
     st.markdown(f"""
     <div style="text-align:center;padding:28px 0 20px;position:relative;z-index:1">
       <div style="font-family:'Sora',sans-serif;font-size:32px;font-weight:800;
-        background:linear-gradient(135deg,{t['GRAD1']},{t['GRAD2']});
+        background:linear-gradient(135deg,#38bdf8,#818cf8);
         -webkit-background-clip:text;-webkit-text-fill-color:transparent">Join ScoreVision AI</div>
-      <div style="color:{t['TX2']};font-size:14px;margin-top:6px">Create your free account in seconds</div>
+      <div style="color:rgba(255,255,255,0.55);font-size:14px;margin-top:6px">Create your free account in seconds</div>
     </div>""", unsafe_allow_html=True)
 
     _,mc,_ = st.columns([0.5,3,0.5])
@@ -959,7 +1094,7 @@ def page_signup(t):
         st.markdown('<div class="sv-auth-card-wrap">', unsafe_allow_html=True)
 
         role = st.radio("I am a", ["Student","Parent"], horizontal=True)
-        st.markdown("<hr class='sv-e'>", unsafe_allow_html=True)
+        st.markdown("<hr style='border:none;border-top:1px solid rgba(255,255,255,0.12);margin:16px 0'>", unsafe_allow_html=True)
 
         c1,c2 = st.columns(2)
         with c1: full_name = st.text_input("Full Name *")
@@ -1088,7 +1223,7 @@ def page_dashboard(t):
     with col_b:
         st.markdown(f'<div class="sv-sh">Your Profile</div><div class="sv-ss">Account overview</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="sv-card">', unsafe_allow_html=True)
-        photo=u.get("photo")
+        photo=u.get("photo"); name=u.get("name","U")
         if photo:
             img_bytes=base64.b64decode(photo)
             img=Image.open(io.BytesIO(img_bytes)).resize((80,80))
@@ -1334,27 +1469,34 @@ def page_profile(t):
     topbar(t)
     st.markdown('<div class="sv-sh">Edit Profile</div><div class="sv-ss">Update your personal information and account settings</div>', unsafe_allow_html=True)
     db=load_db(); usr=st.session_state.user; u=db.get(usr,{})
+
     col_a,col_b = st.columns([1,2])
 
     with col_a:
-        st.markdown(f'<div class="sv-card" style="text-align:center;padding:28px">', unsafe_allow_html=True)
+        # Profile card — pure HTML, no st.container wrapper to avoid blank box
         photo=u.get("photo"); name=u.get("name","U")
         if photo:
             img_bytes=base64.b64decode(photo)
             img=Image.open(io.BytesIO(img_bytes)).resize((120,120))
             buf=io.BytesIO(); img.save(buf,"PNG")
             b64=base64.b64encode(buf.getvalue()).decode()
-            st.markdown(f'<img src="data:image/png;base64,{b64}" style="border-radius:50%;border:4px solid {t["AC"]};width:120px;height:120px;object-fit:cover;display:block;margin:0 auto">', unsafe_allow_html=True)
+            avatar_html=f'<img src="data:image/png;base64,{b64}" style="border-radius:50%;border:4px solid {t["AC"]};width:120px;height:120px;object-fit:cover;display:block;margin:0 auto">'
         else:
             initials="".join([x[0].upper() for x in name.split()[:2]])
-            st.markdown(f"""<div style="width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,{t['GRAD1']}33,{t['GRAD2']}33);border:4px solid {t['AC']};display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;color:{t['AC']};font-family:'Sora',sans-serif;margin:0 auto">{initials}</div>""", unsafe_allow_html=True)
-        st.markdown(f'<div style="margin-top:14px;font-weight:700;font-size:17px;color:{t["TX"]};font-family:Sora,sans-serif">{name}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div style="font-size:13px;color:{t["TX2"]}">{u.get("class","")} &bull; {u.get("role","").capitalize()}</div>', unsafe_allow_html=True)
-        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        # File uploader outside the HTML card to avoid Streamlit rendering issues
-        st.markdown(f'<div style="margin-top:8px;font-size:13px;font-weight:600;color:{t["TX2"]}">Upload Profile Photo</div>', unsafe_allow_html=True)
-        uploaded=st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
+            avatar_html=f"""<div style="width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,{t['GRAD1']}33,{t['GRAD2']}33);border:4px solid {t['AC']};display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;color:{t['AC']};font-family:'Sora',sans-serif;margin:0 auto">{initials}</div>"""
+
+        st.markdown(f"""
+        <div class="sv-card" style="text-align:center;padding:28px">
+          {avatar_html}
+          <div style="margin-top:14px;font-weight:700;font-size:17px;color:{t['TX']};font-family:Sora,sans-serif">{name}</div>
+          <div style="font-size:13px;color:{t['TX2']}">{u.get('class','')} &bull; {u.get('role','').capitalize()}</div>
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid {t['BORDER']}">
+            <div style="font-size:12px;color:{t['TX3']};margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Profile Photo</div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+        # File uploader outside any HTML-div wrapper
+        uploaded=st.file_uploader("Upload new photo", type=["jpg","jpeg","png"], label_visibility="collapsed")
         if uploaded:
             img=Image.open(uploaded).convert("RGB").resize((200,200))
             buf=io.BytesIO(); img.save(buf,"PNG")
@@ -1362,8 +1504,11 @@ def page_profile(t):
             save_db(db); st.success("Photo updated!"); st.rerun()
 
     with col_b:
-        st.markdown('<div class="sv-card">', unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size:16px;font-weight:700;color:{t['TX']};margin-bottom:12px'>✏️ Update Details</div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="sv-card">
+          <div style='font-size:16px;font-weight:700;color:{t['TX']};margin-bottom:16px'>✏️ Update Details</div>
+        </div>""", unsafe_allow_html=True)
+
         new_name=st.text_input("Full Name",value=u.get("name",""))
         c1,c2=st.columns(2)
         with c1:
@@ -1403,7 +1548,6 @@ def page_profile(t):
                     db[usr]["password"]=hash_pw(new_pw)
                     st.success("Password updated!")
             save_db(db); st.success("Profile saved!"); st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────
