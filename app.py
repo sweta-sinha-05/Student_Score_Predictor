@@ -2,8 +2,6 @@ import streamlit as st
 import joblib
 import pandas as pd
 import numpy as np
-import json
-import os
 import base64
 import io
 from datetime import datetime, date
@@ -15,1089 +13,1284 @@ from matplotlib.gridspec import GridSpec
 import warnings
 warnings.filterwarnings('ignore')
 
-# ─────────────────────────────────────────────
-# PAGE CONFIG
-# ─────────────────────────────────────────────
-st.set_page_config(
-    page_title="ScoreVision",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="ScoreVision", page_icon="🎯", layout="wide",
+                   initial_sidebar_state="expanded")
 
-# ─────────────────────────────────────────────
-# THEME SYSTEM
-# ─────────────────────────────────────────────
-THEMES = {
-    "light": {
-        "bg": "#F8F9FF",
-        "card_bg": "#FFFFFF",
-        "sidebar_bg": "#FFFFFF",
-        "text": "#1A1A2E",
-        "subtext": "#555577",
-        "accent": "#4F46E5",
-        "accent2": "#7C3AED",
-        "success": "#059669",
-        "warning": "#D97706",
-        "danger": "#DC2626",
-        "border": "#E2E8F0",
-        "input_bg": "#F1F5F9",
-        "metric_bg": "#EEF2FF",
-        "metric_text": "#4F46E5",
-        "shadow": "rgba(79,70,229,0.08)",
-        "gradient": "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
-        "tag_bg": "#EEF2FF",
-        "tag_text": "#4F46E5",
-        "divider": "#E2E8F0",
-        "muted": "#94A3B8",
-    },
-    "dark": {
-        "bg": "#0F0F1A",
-        "card_bg": "#1A1A2E",
-        "sidebar_bg": "#16213E",
-        "text": "#E8E8FF",
-        "subtext": "#A0A0C0",
-        "accent": "#818CF8",
-        "accent2": "#A78BFA",
-        "success": "#34D399",
-        "warning": "#FBBF24",
-        "danger": "#F87171",
-        "border": "#2D2D50",
-        "input_bg": "#252540",
-        "metric_bg": "#1E1E3A",
-        "metric_text": "#818CF8",
-        "shadow": "rgba(129,140,248,0.15)",
-        "gradient": "linear-gradient(135deg, #818CF8 0%, #A78BFA 100%)",
-        "tag_bg": "#1E1E3A",
-        "tag_text": "#818CF8",
-        "divider": "#2D2D50",
-        "muted": "#6B6B90",
-    }
+# ══════════════════════════════════════════════════════
+#  SESSION STATE
+# ══════════════════════════════════════════════════════
+for k, v in {
+    "theme": "light", "logged_in": False, "page": "landing",
+    "users": {}, "current_user": None,
+    "prediction_result": None, "prediction_inputs": None, "history": []
+}.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ══════════════════════════════════════════════════════
+#  THEME TOKENS
+# ══════════════════════════════════════════════════════
+LIGHT = {
+    "bg":           "#F4F6FB",
+    "surface":      "#FFFFFF",
+    "surface2":     "#F0F2F8",
+    "border":       "#DDE1EE",
+    "text":         "#141527",
+    "text2":        "#4A4E6A",
+    "text3":        "#8487A0",
+    "accent":       "#4F46E5",
+    "accent_light": "#EEF2FF",
+    "accent2":      "#7C3AED",
+    "success":      "#059669",
+    "success_bg":   "#D1FAE5",
+    "warn":         "#B45309",
+    "warn_bg":      "#FEF3C7",
+    "danger":       "#DC2626",
+    "danger_bg":    "#FEE2E2",
+    "grad_a":       "#4F46E5",
+    "grad_b":       "#7C3AED",
+    "chart_grid":   "#E5E7F5",
+    "shadow":       "0 2px 16px rgba(79,70,229,0.10)",
 }
+DARK = {
+    "bg":           "#0C0D1A",
+    "surface":      "#14162A",
+    "surface2":     "#1C1F38",
+    "border":       "#252844",
+    "text":         "#ECEEFF",
+    "text2":        "#A0A4C8",
+    "text3":        "#5A5E80",
+    "accent":       "#818CF8",
+    "accent_light": "#1A1D3A",
+    "accent2":      "#A78BFA",
+    "success":      "#34D399",
+    "success_bg":   "#064E3B",
+    "warn":         "#FCD34D",
+    "warn_bg":      "#451A03",
+    "danger":       "#F87171",
+    "danger_bg":    "#450A0A",
+    "grad_a":       "#818CF8",
+    "grad_b":       "#A78BFA",
+    "chart_grid":   "#1E2240",
+    "shadow":       "0 2px 16px rgba(0,0,0,0.45)",
+}
+T = DARK if st.session_state.theme == "dark" else LIGHT
 
-# ─────────────────────────────────────────────
-# SESSION STATE INIT
-# ─────────────────────────────────────────────
-if "theme" not in st.session_state:
-    st.session_state.theme = "light"
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "page" not in st.session_state:
-    st.session_state.page = "landing"
-if "users" not in st.session_state:
-    st.session_state.users = {}
-if "current_user" not in st.session_state:
-    st.session_state.current_user = None
-if "prediction_result" not in st.session_state:
-    st.session_state.prediction_result = None
-if "prediction_inputs" not in st.session_state:
-    st.session_state.prediction_inputs = None
-if "history" not in st.session_state:
-    st.session_state.history = []
+CLASS_OPTIONS = [
+    "Class 1","Class 2","Class 3","Class 4","Class 5",
+    "Class 6","Class 7","Class 8","Class 9","Class 10",
+    "Class 11 (Science)","Class 11 (Commerce)","Class 11 (Arts)",
+    "Class 12 (Science)","Class 12 (Commerce)","Class 12 (Arts)",
+    "Undergraduate – Year 1","Undergraduate – Year 2",
+    "Undergraduate – Year 3","Undergraduate – Year 4",
+    "Postgraduate","Diploma","Other"
+]
 
-T = THEMES[st.session_state.theme]
-
-# ─────────────────────────────────────────────
-# GLOBAL CSS
-# ─────────────────────────────────────────────
-def inject_css(T):
+# ══════════════════════════════════════════════════════
+#  GLOBAL CSS
+# ══════════════════════════════════════════════════════
+def inject_css():
     st.markdown(f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    /* ── ROOT ── */
-    html, body, [data-testid="stAppViewContainer"] {{
-        background-color: {T['bg']} !important;
-        font-family: 'DM Sans', sans-serif;
-        color: {T['text']} !important;
-    }}
-    [data-testid="stSidebar"] {{
-        background-color: {T['sidebar_bg']} !important;
-        border-right: 1px solid {T['border']} !important;
-    }}
-    [data-testid="stSidebar"] * {{
-        color: {T['text']} !important;
-    }}
-    .stApp {{ background-color: {T['bg']} !important; }}
-    section[data-testid="stMain"] {{ background-color: {T['bg']} !important; }}
+*, *::before, *::after {{ box-sizing: border-box; }}
 
-    /* ── TYPOGRAPHY ── */
-    h1,h2,h3,h4,h5,h6 {{
-        font-family: 'Space Grotesk', sans-serif !important;
-        color: {T['text']} !important;
-        font-weight: 700 !important;
-    }}
-    p, span, label, div {{ color: {T['text']}; }}
+html, body,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+.main, .block-container,
+section[data-testid="stMain"],
+.stApp {{ background: {T['bg']} !important; }}
 
-    /* ── INPUTS ── */
-    .stTextInput>div>div>input,
-    .stNumberInput>div>div>input,
-    .stSelectbox>div>div,
-    .stDateInput>div>div>input,
-    .stTextArea>div>div>textarea {{
-        background-color: {T['input_bg']} !important;
-        color: {T['text']} !important;
-        border: 1.5px solid {T['border']} !important;
-        border-radius: 10px !important;
-        font-family: 'DM Sans', sans-serif !important;
-        font-size: 14px !important;
-    }}
-    .stSelectbox>div>div>div {{ color: {T['text']} !important; }}
-    [data-baseweb="select"] {{ background-color: {T['input_bg']} !important; }}
-    [data-baseweb="select"] * {{ color: {T['text']} !important; }}
-    [data-baseweb="popover"] {{ background-color: {T['card_bg']} !important; }}
-    [data-baseweb="menu"] {{ background-color: {T['card_bg']} !important; }}
-    [data-baseweb="option"] {{ background-color: {T['card_bg']} !important; color: {T['text']} !important; }}
-    [data-baseweb="option"]:hover {{ background-color: {T['input_bg']} !important; }}
-    [data-baseweb="base-input"] {{ background-color: {T['input_bg']} !important; color: {T['text']} !important; }}
+body, p, div, span, label, li {{ color: {T['text']} !important; font-family: 'Outfit', sans-serif !important; }}
+h1,h2,h3,h4,h5,h6 {{ color: {T['text']} !important; font-family: 'Outfit', sans-serif !important; font-weight: 600 !important; }}
 
-    /* ── LABELS ── */
-    .stTextInput label, .stNumberInput label, .stSelectbox label,
-    .stDateInput label, .stTextArea label, .stRadio label,
-    [data-testid="stWidgetLabel"] p {{
-        color: {T['subtext']} !important;
-        font-size: 13px !important;
-        font-weight: 500 !important;
-        letter-spacing: 0.02em;
-    }}
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {{
+    background: {T['surface']} !important;
+    border-right: 1px solid {T['border']} !important;
+}}
+[data-testid="stSidebar"] * {{ color: {T['text']} !important; font-family: 'Outfit', sans-serif !important; }}
+[data-testid="stSidebarContent"] {{ padding-top: 0 !important; }}
 
-    /* ── BUTTONS ── */
-    .stButton>button {{
-        background: {T['gradient']} !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 12px !important;
-        font-family: 'Space Grotesk', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
-        padding: 10px 24px !important;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 4px 15px {T['shadow']} !important;
-        letter-spacing: 0.02em;
-    }}
-    .stButton>button:hover {{
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 25px {T['shadow']} !important;
-    }}
+/* ── Block container ── */
+.block-container {{ padding: 2rem 2.5rem !important; max-width: 1100px; }}
 
-    /* ── DIVIDER ── */
-    hr {{ border-color: {T['divider']} !important; }}
+/* ── Inputs ── */
+.stTextInput > div > div > input,
+.stNumberInput > div > div > input,
+.stDateInput > div > div > input,
+.stTextArea > div > div > textarea {{
+    background: {T['surface2']} !important;
+    color: {T['text']} !important;
+    border: 1.5px solid {T['border']} !important;
+    border-radius: 10px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 14px !important;
+    padding: 10px 14px !important;
+}}
+.stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus {{
+    border-color: {T['accent']} !important;
+    box-shadow: 0 0 0 3px {T['accent_light']} !important;
+}}
 
-    /* ── METRIC ── */
-    [data-testid="stMetric"] {{
-        background: {T['metric_bg']} !important;
-        border-radius: 16px !important;
-        padding: 16px !important;
-        border: 1px solid {T['border']} !important;
-    }}
-    [data-testid="stMetricValue"] {{ color: {T['metric_text']} !important; font-family: 'Space Grotesk',sans-serif !important; }}
-    [data-testid="stMetricLabel"] {{ color: {T['subtext']} !important; }}
+/* ── Selectbox ── */
+[data-baseweb="select"] > div,
+[data-baseweb="select"] > div > div {{
+    background: {T['surface2']} !important;
+    border: 1.5px solid {T['border']} !important;
+    border-radius: 10px !important;
+    color: {T['text']} !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 14px !important;
+}}
+[data-baseweb="select"] * {{ color: {T['text']} !important; }}
+[data-baseweb="popover"], [data-baseweb="menu"] {{
+    background: {T['surface']} !important;
+    border: 1px solid {T['border']} !important;
+    border-radius: 12px !important;
+}}
+[data-baseweb="option"] {{
+    background: {T['surface']} !important;
+    color: {T['text']} !important;
+    font-family: 'Outfit', sans-serif !important;
+}}
+[data-baseweb="option"]:hover {{ background: {T['surface2']} !important; }}
+[data-baseweb="base-input"] {{
+    background: {T['surface2']} !important;
+    color: {T['text']} !important;
+}}
 
-    /* ── ALERTS ── */
-    .stAlert {{ border-radius: 12px !important; }}
-    .stSuccess {{ background-color: {T['card_bg']} !important; border-left: 4px solid {T['success']} !important; }}
-    .stWarning {{ background-color: {T['card_bg']} !important; border-left: 4px solid {T['warning']} !important; }}
-    .stError {{ background-color: {T['card_bg']} !important; border-left: 4px solid {T['danger']} !important; }}
-    .stInfo {{ background-color: {T['card_bg']} !important; border-left: 4px solid {T['accent']} !important; }}
+/* ── Widget labels ── */
+[data-testid="stWidgetLabel"] p,
+.stTextInput label,
+.stNumberInput label,
+.stSelectbox label,
+.stDateInput label,
+.stTextArea label,
+.stRadio label,
+.stFileUploader label {{
+    color: {T['text2']} !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    font-family: 'Outfit', sans-serif !important;
+    letter-spacing: 0.01em !important;
+    margin-bottom: 4px !important;
+}}
 
-    /* ── RADIO ── */
-    .stRadio > div {{ gap: 8px; }}
-    .stRadio > div > label {{
-        background: {T['input_bg']} !important;
-        border: 1.5px solid {T['border']} !important;
-        border-radius: 10px !important;
-        padding: 8px 16px !important;
-        cursor: pointer;
-        color: {T['text']} !important;
-    }}
+/* ── Buttons ── */
+.stButton > button {{
+    background: linear-gradient(135deg, {T['grad_a']}, {T['grad_b']}) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 10px 20px !important;
+    transition: opacity 0.18s, transform 0.18s !important;
+    box-shadow: {T['shadow']} !important;
+    letter-spacing: 0.02em !important;
+}}
+.stButton > button:hover {{ opacity: 0.88 !important; transform: translateY(-1px) !important; }}
+.stButton > button:active {{ transform: translateY(0) !important; }}
 
-    /* ── CUSTOM CARDS ── */
-    .sv-card {{
-        background: {T['card_bg']};
-        border: 1px solid {T['border']};
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 4px 24px {T['shadow']};
-        margin-bottom: 20px;
-    }}
-    .sv-hero {{
-        background: {T['gradient']};
-        border-radius: 24px;
-        padding: 32px 40px;
-        color: #fff !important;
-        margin-bottom: 28px;
-    }}
-    .sv-hero * {{ color: #fff !important; }}
-    .sv-section-title {{
-        font-family: 'Space Grotesk', sans-serif;
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: {T['accent']};
-        margin-bottom: 12px;
-    }}
-    .sv-tag {{
-        display: inline-block;
-        background: {T['tag_bg']};
-        color: {T['tag_text']};
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-    }}
-    .sv-score-ring {{
-        text-align: center;
-        padding: 24px;
-    }}
+/* ── Tabs ── */
+[data-baseweb="tab-list"] {{
+    background: {T['surface2']} !important;
+    border-radius: 12px !important;
+    padding: 4px !important;
+    gap: 2px !important;
+    border-bottom: none !important;
+}}
+[data-baseweb="tab"] {{
+    background: transparent !important;
+    border-radius: 8px !important;
+    color: {T['text2']} !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 500 !important;
+    border: none !important;
+    padding: 8px 20px !important;
+}}
+[aria-selected="true"][data-baseweb="tab"] {{
+    background: {T['surface']} !important;
+    color: {T['accent']} !important;
+    font-weight: 600 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12) !important;
+}}
 
-    /* scrollbar */
-    ::-webkit-scrollbar {{ width: 6px; }}
-    ::-webkit-scrollbar-track {{ background: {T['bg']}; }}
-    ::-webkit-scrollbar-thumb {{ background: {T['border']}; border-radius: 10px; }}
+/* ── Metrics ── */
+[data-testid="metric-container"] {{
+    background: {T['surface']} !important;
+    border: 1px solid {T['border']} !important;
+    border-radius: 14px !important;
+    padding: 18px 20px !important;
+    box-shadow: {T['shadow']} !important;
+}}
+[data-testid="stMetricValue"] {{
+    color: {T['accent']} !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 28px !important;
+}}
+[data-testid="stMetricLabel"] {{
+    color: {T['text2']} !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}}
 
-    /* sidebar nav items */
-    .sv-nav-item {{
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 14px;
-        border-radius: 12px;
-        margin-bottom: 4px;
-        cursor: pointer;
-        font-weight: 500;
-        color: {T['text']};
-        transition: background 0.15s;
-    }}
-    .sv-nav-item:hover {{ background: {T['input_bg']}; }}
-    .sv-nav-item.active {{
-        background: {T['metric_bg']};
-        color: {T['accent']};
-        font-weight: 600;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+/* ── Alerts ── */
+[data-testid="stAlert"] {{
+    border-radius: 12px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 14px !important;
+}}
+.stSuccess > div {{ background: {T['success_bg']} !important; color: {T['success']} !important; border: 1px solid {T['success']} !important; }}
+.stWarning > div {{ background: {T['warn_bg']} !important; color: {T['warn']} !important; border: 1px solid {T['warn']} !important; }}
+.stError > div {{ background: {T['danger_bg']} !important; color: {T['danger']} !important; border: 1px solid {T['danger']} !important; }}
+.stInfo > div {{ background: {T['accent_light']} !important; color: {T['accent']} !important; border: 1px solid {T['accent']} !important; }}
+
+/* ── File uploader ── */
+[data-testid="stFileUploader"] {{
+    background: {T['surface2']} !important;
+    border: 1.5px dashed {T['border']} !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+}}
+[data-testid="stFileUploader"] * {{ color: {T['text']} !important; }}
+
+/* ── Dataframe ── */
+[data-testid="stDataFrame"] {{ border-radius: 12px !important; overflow: hidden !important; }}
+.dvn-scroller * {{ color: {T['text']} !important; background: {T['surface']} !important; }}
+
+/* ── Number input arrows ── */
+.stNumberInput button {{ color: {T['text']} !important; background: {T['surface2']} !important; border: 1px solid {T['border']} !important; }}
+
+/* ── HR ── */
+hr {{ border-color: {T['border']} !important; margin: 0 !important; }}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {{ width: 5px; height: 5px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{ background: {T['border']}; border-radius: 10px; }}
+
+/* ── Progress bar ── */
+.stProgress > div > div {{ background: {T['accent']} !important; border-radius: 10px !important; }}
+.stProgress > div {{ background: {T['surface2']} !important; border-radius: 10px !important; }}
+
+/* ── Custom classes ── */
+.sv-card {{
+    background: {T['surface']};
+    border: 1px solid {T['border']};
+    border-radius: 16px;
+    padding: 24px 28px;
+    box-shadow: {T['shadow']};
+    margin-bottom: 16px;
+}}
+.sv-hero {{
+    background: linear-gradient(135deg, {T['grad_a']} 0%, {T['grad_b']} 100%);
+    border-radius: 18px;
+    padding: 28px 36px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}}
+.sv-pill {{
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border: 1px solid rgba(255,255,255,0.25);
+}}
+.sv-label {{
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: {T['accent']};
+    margin-bottom: 10px;
+    display: block;
+}}
+.sv-stat {{
+    background: {T['accent_light']};
+    border: 1px solid {T['border']};
+    border-radius: 12px;
+    padding: 14px 18px;
+    text-align: center;
+}}
+.sv-nav-btn {{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: {T['text2']};
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-bottom: 3px;
+    font-family: 'Outfit', sans-serif;
+    transition: background 0.15s;
+}}
+.sv-nav-btn:hover {{ background: {T['surface2']}; color: {T['text']}; }}
+.sv-nav-btn.active {{ background: {T['accent_light']}; color: {T['accent']}; font-weight: 600; }}
+</style>
+""", unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────
-def card(content_fn, title=None):
-    st.markdown(f'<div class="sv-card">', unsafe_allow_html=True)
-    if title:
-        st.markdown(f'<div class="sv-section-title">{title}</div>', unsafe_allow_html=True)
-    content_fn()
-    st.markdown('</div>', unsafe_allow_html=True)
+# ══════════════════════════════════════════════════════
+#  HELPERS
+# ══════════════════════════════════════════════════════
+def get_grade(s):
+    if s >= 90: return "A+", "🏆", "Outstanding"
+    if s >= 80: return "A",  "🥇", "Excellent"
+    if s >= 70: return "B",  "🥈", "Good"
+    if s >= 60: return "C",  "🥉", "Average"
+    if s >= 50: return "D",  "📘", "Below Average"
+    return "F", "⚠️", "Needs Improvement"
 
-def get_grade(score):
-    if score >= 90: return "A+", "🏆"
-    elif score >= 80: return "A", "🥇"
-    elif score >= 70: return "B", "🥈"
-    elif score >= 60: return "C", "🥉"
-    elif score >= 50: return "D", "📘"
-    else: return "F", "⚠️"
-
-def grade_color(score):
-    if score >= 80: return T['success']
-    elif score >= 60: return T['warning']
-    else: return T['danger']
+def score_color(s):
+    if s >= 80: return T['success']
+    if s >= 60: return T['warn']
+    return T['danger']
 
 def load_model():
     try:
-        model = joblib.load("student_model.pkl")
-        columns = joblib.load("model_columns.pkl")
-        return model, columns
+        return joblib.load("student_model.pkl"), joblib.load("model_columns.pkl")
     except:
         return None, None
 
-def predict_score(inputs, model, columns):
+def predict_score(inp, model, columns):
     data = {
-        "Hours_Studied": inputs['hours'],
-        "Attendance": inputs['attendance'],
-        "Previous_Scores": inputs['previous'],
-        "Sleep_Hours": inputs['sleep'],
-        "Motivation_Level": inputs['motivation'],
-        "Teacher_Quality": inputs['teacher'],
-        "School_Type": inputs['school'],
-        "Internet_Access": inputs['internet'],
-        "Family_Income": inputs['income'],
-        "Parental_Involvement": inputs['parent'],
-        "Parental_Education_Level": inputs['education'],
-        "Peer_Influence": inputs['peer'],
-        "Learning_Resources": inputs['resources'],
-        "Extracurricular_Activities": inputs['activities'],
+        "Hours_Studied": inp['hours'], "Attendance": inp['attendance'],
+        "Previous_Scores": inp['previous'], "Sleep_Hours": inp['sleep'],
+        "Motivation_Level": inp['motivation'], "Teacher_Quality": inp['teacher'],
+        "School_Type": inp['school_type'], "Internet_Access": inp['internet'],
+        "Family_Income": inp['income'], "Parental_Involvement": inp['parent'],
+        "Parental_Education_Level": inp['education'], "Peer_Influence": inp['peer'],
+        "Learning_Resources": inp['resources'], "Extracurricular_Activities": inp['activities'],
     }
-    df = pd.DataFrame([data])
-    df = pd.get_dummies(df)
+    df = pd.get_dummies(pd.DataFrame([data]))
     df = df.reindex(columns=columns, fill_value=0)
-    pred = model.predict(df)
-    return int(round(max(40, min(100, pred[0]))))
+    return int(round(max(40, min(100, model.predict(df)[0]))))
 
-def img_to_b64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=150,
-                facecolor=fig.get_facecolor())
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode()
 
-def make_report_pdf(user, score, inputs):
-    """Generate a simple PDF-like HTML report as bytes using reportlab if available, else fallback to matplotlib"""
+def make_charts(score, inp, user=None):
+    is_dark = st.session_state.theme == "dark"
+    bg   = '#0C0D1A' if is_dark else '#F4F6FB'
+    surf = '#14162A' if is_dark else '#FFFFFF'
+    txt  = '#ECEEFF' if is_dark else '#141527'
+    sub  = '#A0A4C8' if is_dark else '#4A4E6A'
+    grid = '#1E2240' if is_dark else '#E5E7F5'
+    acc  = '#818CF8' if is_dark else '#4F46E5'
+    grn  = '#34D399' if is_dark else '#059669'
+    ylw  = '#FCD34D' if is_dark else '#D97706'
+    red  = '#F87171' if is_dark else '#DC2626'
+    pur  = '#C084FC' if is_dark else '#9333EA'
+    sc   = grn if score >= 80 else ylw if score >= 60 else red
+    grade, emoji, label = get_grade(score)
+
+    plt.rcParams.update({
+        'font.family': 'DejaVu Sans',
+        'axes.facecolor': surf,
+        'figure.facecolor': bg,
+        'text.color': txt,
+        'axes.labelcolor': sub,
+        'xtick.color': sub,
+        'ytick.color': sub,
+        'axes.edgecolor': grid,
+        'grid.color': grid,
+        'axes.grid': True,
+        'grid.alpha': 0.5,
+        'grid.linestyle': '--',
+    })
+
+    fig = plt.figure(figsize=(16, 11), facecolor=bg)
+    gs  = GridSpec(2, 3, figure=fig, hspace=0.50, wspace=0.38,
+                   left=0.06, right=0.97, top=0.91, bottom=0.08)
+
+    # ── Header strip ──────────────────────────────────
+    ax_hdr = fig.add_axes([0, 0.93, 1, 0.07], facecolor='none')
+    ax_hdr.axis('off')
+    name = user.get('name','') if user else ''
+    ax_hdr.text(0.03, 0.5, '🎯  ScoreVision – Performance Report',
+                va='center', fontsize=16, fontweight='bold', color=acc)
+    ax_hdr.text(0.97, 0.5,
+                f"Student: {name}   |   {datetime.now().strftime('%d %b %Y')}",
+                va='center', ha='right', fontsize=11, color=sub)
+
+    # ────────────────────────────────────────────────
+    # CHART 1 · Semi-circular gauge
+    # ────────────────────────────────────────────────
+    ax1 = fig.add_subplot(gs[0, 0], facecolor=surf)
+    theta   = np.linspace(0, np.pi, 300)
+    theta_f = np.linspace(0, np.pi * (score / 100), 300)
+    lw = 18
+    ax1.plot(np.cos(theta), np.sin(theta), color=grid, lw=lw,
+             solid_capstyle='round', zorder=1)
+    ax1.plot(np.cos(theta_f), np.sin(theta_f), color=sc, lw=lw,
+             solid_capstyle='round', zorder=2)
+    # Concentric ring glow
+    ax1.plot(np.cos(theta_f), np.sin(theta_f), color=sc, lw=lw+10,
+             solid_capstyle='round', zorder=1, alpha=0.08)
+    ax1.set_xlim(-1.5, 1.5); ax1.set_ylim(-0.45, 1.4)
+    ax1.axis('off')
+    ax1.text(0, 0.40, f"{score}", ha='center', va='center',
+             fontsize=46, fontweight='bold', color=sc)
+    ax1.text(0, 0.10, f"Grade  {grade}  {emoji}", ha='center', va='center',
+             fontsize=14, color=txt)
+    ax1.text(0, -0.22, label, ha='center', fontsize=11, color=sub)
+    ax1.text(0, -0.38, "Predicted Score / 100", ha='center', fontsize=9, color=sub)
+    # Band ticks
+    for pct, lbl in [(0,"0"),(0.5,"50"),(1.0,"100")]:
+        ang = np.pi * pct
+        ax1.text(-np.cos(ang)*1.35, np.sin(ang)*1.35 - 0.04, lbl,
+                 ha='center', va='center', fontsize=8, color=sub)
+
+    # ────────────────────────────────────────────────
+    # CHART 2 · Horizontal progress bars (numeric)
+    # ────────────────────────────────────────────────
+    ax2 = fig.add_subplot(gs[0, 1], facecolor=surf)
+    items  = [('Hours Studied', inp.get('hours',0), 24, acc),
+              ('Attendance',    inp.get('attendance',0), 100, grn),
+              ('Prev Score',    inp.get('previous',0), 100, ylw),
+              ('Sleep Hours',   inp.get('sleep',0), 12, pur)]
+    y_pos  = np.arange(len(items))
+    bar_h  = 0.46
+    for i, (lbl, val, mx, clr) in enumerate(items):
+        pct = val / mx
+        ax2.barh(i, 1.0,  height=bar_h, color=grid,  alpha=0.55, zorder=1)
+        ax2.barh(i, pct,  height=bar_h, color=clr, alpha=0.90,  zorder=2)
+        ax2.text(pct + 0.02, i, f"{val}", va='center', fontsize=11,
+                 fontweight='bold', color=clr)
+        ax2.text(-0.02, i, lbl, va='center', ha='right', fontsize=10, color=sub)
+    ax2.set_xlim(-0.55, 1.28)
+    ax2.set_ylim(-0.6, len(items) - 0.4)
+    ax2.axis('off')
+    ax2.set_title('Study Metrics', fontsize=12, fontweight='bold',
+                  color=txt, pad=10, loc='left')
+
+    # ────────────────────────────────────────────────
+    # CHART 3 · Radar
+    # ────────────────────────────────────────────────
+    ax3 = fig.add_subplot(gs[0, 2], polar=True, facecolor=surf)
+    cats  = ['Hours\nStudied', 'Attendance', 'Prev\nScore', 'Sleep\nHrs', 'Pred\nScore']
+    norms = [inp.get('hours',0)/24, inp.get('attendance',0)/100,
+             inp.get('previous',0)/100, inp.get('sleep',0)/12, score/100]
+    N     = len(cats)
+    angs  = [n/N*2*np.pi for n in range(N)]
+    angs += angs[:1]; norms_c = norms + norms[:1]
+    ax3.set_facecolor(surf)
+    for r in [0.25, 0.5, 0.75, 1.0]:
+        ax3.plot(np.linspace(0, 2*np.pi, 300), [r]*300,
+                 color=grid, lw=0.8, alpha=0.7)
+    ax3.fill(angs, norms_c, alpha=0.22, color=acc)
+    ax3.plot(angs, norms_c, 'o-', lw=2.2, color=acc, markersize=6,
+             markerfacecolor=surf, markeredgewidth=2)
+    ax3.set_xticks(angs[:-1])
+    ax3.set_xticklabels(cats, size=9, color=txt)
+    ax3.set_yticks([0.25, 0.5, 0.75, 1.0])
+    ax3.set_yticklabels(['25%','50%','75%','100%'], size=7, color=sub)
+    ax3.tick_params(colors=sub)
+    ax3.spines['polar'].set_color(grid)
+    ax3.set_title('Performance Radar', fontsize=12, fontweight='bold',
+                  color=txt, pad=16, loc='center')
+    ax3.grid(False)
+
+    # ────────────────────────────────────────────────
+    # CHART 4 · Qualitative factors grouped bar
+    # ────────────────────────────────────────────────
+    ax4 = fig.add_subplot(gs[1, :2], facecolor=surf)
+    qual_cfg = {
+        'Motivation':       {'Low':1,'Medium':2,'High':3},
+        'Teacher Quality':  {'Poor':1,'Average':2,'Good':3},
+        'Peer Influence':   {'Negative':1,'Neutral':2,'Positive':3},
+        'Resources':        {'Low':1,'Medium':2,'High':3},
+        'Family Income':    {'Low':1,'Medium':2,'High':3},
+        'Parent Involve':   {'Low':1,'Medium':2,'High':3},
+    }
+    keys   = ['motivation','teacher','peer','resources','income','parent']
+    labels_q = list(qual_cfg.keys())
+    vals_q = [qual_cfg[labels_q[i]].get(str(inp.get(keys[i],'')),1)
+              for i in range(len(keys))]
+    bar_colors_q = [grn if v==3 else ylw if v==2 else red for v in vals_q]
+    x = np.arange(len(labels_q))
+    bars4 = ax4.bar(x, vals_q, color=bar_colors_q, width=0.52, zorder=2,
+                    edgecolor=surf, linewidth=1.5, alpha=0.88)
+    for bar, val in zip(bars4, vals_q):
+        lbl_map = {1:'Low', 2:'Med', 3:'High'}
+        ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.06,
+                 lbl_map[val], ha='center', fontsize=9, fontweight='bold',
+                 color=bar_colors_q[vals_q.index(val)])
+    ax4.set_xticks(x)
+    ax4.set_xticklabels(labels_q, fontsize=10, color=txt)
+    ax4.set_yticks([1,2,3]); ax4.set_yticklabels(['Low','Medium','High'], color=sub)
+    ax4.set_ylim(0, 3.6)
+    ax4.spines[['top','right']].set_visible(False)
+    ax4.spines[['left','bottom']].set_color(grid)
+    ax4.set_title('Qualitative Factors', fontsize=12, fontweight='bold',
+                  color=txt, pad=10, loc='left')
+    legend_patches = [
+        mpatches.Patch(color=grn, label='High / Positive'),
+        mpatches.Patch(color=ylw, label='Medium / Neutral'),
+        mpatches.Patch(color=red, label='Low / Negative'),
+    ]
+    ax4.legend(handles=legend_patches, fontsize=9, loc='upper right',
+               facecolor=surf, labelcolor=txt,
+               edgecolor=grid, framealpha=0.9, ncol=3)
+
+    # ────────────────────────────────────────────────
+    # CHART 5 · Grade band + score pointer
+    # ────────────────────────────────────────────────
+    ax5 = fig.add_subplot(gs[1, 2], facecolor=surf)
+    bands  = [('F',  0,  49, red),   ('D', 50, 59, '#FB923C'),
+              ('C', 60, 69, ylw),    ('B', 70, 79, '#86EFAC'),
+              ('A', 80, 89, grn),    ('A+',90,100,'#22D3EE')]
+    for i, (g, lo, hi, clr) in enumerate(bands):
+        ax5.barh(i, hi-lo, left=lo, height=0.65, color=clr,
+                 alpha=0.75 if score < lo or score > hi else 1.0,
+                 zorder=2, edgecolor=surf, linewidth=1)
+        ax5.text(lo + (hi-lo)/2, i, g, ha='center', va='center',
+                 fontsize=11, fontweight='bold',
+                 color='#111' if clr in [ylw,'#86EFAC','#22D3EE'] else '#fff')
+    ax5.axvline(score, color=txt, lw=2.5, zorder=5, linestyle='--', alpha=0.85)
+    ax5.text(score, len(bands)-0.1, f'  {score}', color=txt,
+             fontsize=10, fontweight='bold', va='top')
+    ax5.set_xlim(0, 110); ax5.set_ylim(-0.5, len(bands)-0.3)
+    ax5.set_xlabel('Score Range', fontsize=10, color=sub)
+    ax5.yaxis.set_visible(False)
+    ax5.spines[['top','right','left']].set_visible(False)
+    ax5.spines['bottom'].set_color(grid)
+    ax5.set_title('Grade Band', fontsize=12, fontweight='bold',
+                  color=txt, pad=10, loc='left')
+    ax5.grid(axis='x', alpha=0.35)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.93])
+    return fig
+
+
+def make_pdf(user, score, inp):
     try:
         from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
+        from reportlab.lib import colors as rl_colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
         from reportlab.lib.units import cm
+
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+                                leftMargin=2*cm, rightMargin=2*cm,
+                                topMargin=2*cm, bottomMargin=2*cm)
         styles = getSampleStyleSheet()
-        grade, emoji = get_grade(score)
-        story = []
-        title_style = ParagraphStyle('title', parent=styles['Title'], fontSize=26, textColor=colors.HexColor('#4F46E5'), spaceAfter=4)
-        sub_style = ParagraphStyle('sub', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#555577'), spaceAfter=16)
-        head_style = ParagraphStyle('head', parent=styles['Heading2'], fontSize=13, textColor=colors.HexColor('#4F46E5'), spaceAfter=6)
-        body_style = ParagraphStyle('body', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#1A1A2E'), leading=18)
-        story.append(Paragraph("🎯 ScoreVision", title_style))
-        story.append(Paragraph("Student Performance Report", sub_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E2E8F0')))
-        story.append(Spacer(1, 12))
-        story.append(Paragraph(f"Name: {user.get('name','—')}", body_style))
-        story.append(Paragraph(f"Role: {user.get('role','—').capitalize()}", body_style))
-        story.append(Paragraph(f"Class: {user.get('class_std','—')}", body_style))
-        story.append(Paragraph(f"School: {user.get('school_name','—')}", body_style))
-        story.append(Paragraph(f"Date of Birth: {user.get('dob','—')}", body_style))
-        story.append(Paragraph(f"Report Generated: {datetime.now().strftime('%d %B %Y, %H:%M')}", body_style))
-        story.append(Spacer(1, 16))
-        story.append(Paragraph("Predicted Score", head_style))
-        score_color = colors.HexColor('#059669') if score>=80 else colors.HexColor('#D97706') if score>=60 else colors.HexColor('#DC2626')
-        story.append(Paragraph(f"<font size=32 color='#{('%02x%02x%02x' % (int(score_color.red*255), int(score_color.green*255), int(score_color.blue*255)))}'>● {score}/100</font>", body_style))
-        story.append(Paragraph(f"Grade: {grade} {emoji}", body_style))
-        story.append(Spacer(1, 16))
-        story.append(Paragraph("Input Details", head_style))
-        table_data = [["Parameter", "Value"]]
-        for k, v in inputs.items():
-            table_data.append([k.replace('_',' ').title(), str(v)])
-        t = Table(table_data, colWidths=[8*cm, 8*cm])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4F46E5')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('FONTSIZE', (0,0), (-1,-1), 11),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8F9FF'), colors.HexColor('#EEF2FF')]),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-            ('ROUNDEDCORNERS', [6]),
-            ('TOPPADDING', (0,0), (-1,-1), 7),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+        IND = rl_colors.HexColor('#4F46E5')
+        GRY = rl_colors.HexColor('#4A4E6A')
+        BLK = rl_colors.HexColor('#141527')
+        grade, emoji, label = get_grade(score)
+        sc_hex = '#059669' if score>=80 else '#B45309' if score>=60 else '#DC2626'
+
+        story = [
+            Paragraph('<font color="#4F46E5" size="28"><b>🎯 ScoreVision</b></font>', styles['Title']),
+            Paragraph('<font color="#4A4E6A" size="13">Student Performance Report</font>', styles['Normal']),
+            Spacer(1, 8),
+            HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor('#DDE1EE')),
+            Spacer(1, 12),
+        ]
+        info = [
+            ['Name',    user.get('name','—'),     'Role',  user.get('role','—').capitalize()],
+            ['Class',   user.get('class_std','—'), 'School',user.get('school_name','—')],
+            ['DOB',     user.get('dob','—'),       'City',  user.get('city','—')],
+            ['Date',    datetime.now().strftime('%d %B %Y'), '', ''],
+        ]
+        t_info = Table(info, colWidths=[3.5*cm,7*cm,3.5*cm,7*cm])
+        t_info.setStyle(TableStyle([
+            ('FONTSIZE',  (0,0),(-1,-1), 11),
+            ('TEXTCOLOR', (0,0),(0,-1), IND), ('FONTNAME',(0,0),(0,-1),'Helvetica-Bold'),
+            ('TEXTCOLOR', (2,0),(2,-1), IND), ('FONTNAME',(2,0),(2,-1),'Helvetica-Bold'),
+            ('TEXTCOLOR', (1,0),(-1,-1), BLK),
+            ('TOPPADDING',(0,0),(-1,-1), 5),
+            ('BOTTOMPADDING',(0,0),(-1,-1), 5),
         ]))
-        story.append(t)
+        story += [t_info, Spacer(1, 16)]
+        story.append(Paragraph(
+            f'<font size="36" color="{sc_hex}"><b>{score}/100</b></font>  '
+            f'<font size="18" color="{sc_hex}">{grade} {emoji}</font>  '
+            f'<font size="14" color="#4A4E6A">{label}</font>', styles['Normal']))
+        story.append(Spacer(1, 14))
+
+        detail = [['Parameter','Value','Parameter','Value']]
+        kv = [
+            ('Hours Studied', inp.get('hours',0)),
+            ('Attendance %',  inp.get('attendance',0)),
+            ('Previous Score',inp.get('previous',0)),
+            ('Sleep Hours',   inp.get('sleep',0)),
+            ('Motivation',    inp.get('motivation','')),
+            ('Teacher Quality',inp.get('teacher','')),
+            ('School Type',   inp.get('school_type','')),
+            ('Internet',      inp.get('internet','')),
+            ('Family Income', inp.get('income','')),
+            ('Parent Involve',inp.get('parent','')),
+            ('Parent Edu',    inp.get('education','')),
+            ('Peer Influence',inp.get('peer','')),
+            ('Resources',     inp.get('resources','')),
+            ('Extracurricular',inp.get('activities','')),
+        ]
+        for i in range(0, len(kv), 2):
+            row = [kv[i][0], str(kv[i][1])]
+            if i+1 < len(kv): row += [kv[i+1][0], str(kv[i+1][1])]
+            else:              row += ['','']
+            detail.append(row)
+
+        t2 = Table(detail, colWidths=[4*cm,5*cm,4*cm,5*cm])
+        t2.setStyle(TableStyle([
+            ('BACKGROUND',  (0,0),(-1,0), IND),
+            ('TEXTCOLOR',   (0,0),(-1,0), rl_colors.white),
+            ('FONTNAME',    (0,0),(-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE',    (0,0),(-1,-1), 10),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1),
+             [rl_colors.HexColor('#F4F6FB'), rl_colors.HexColor('#EEF2FF')]),
+            ('GRID',(0,0),(-1,-1), 0.4, rl_colors.HexColor('#DDE1EE')),
+            ('TOPPADDING',(0,0),(-1,-1), 6),
+            ('BOTTOMPADDING',(0,0),(-1,-1), 6),
+            ('TEXTCOLOR',(0,1),(0,-1), IND),
+            ('TEXTCOLOR',(2,1),(2,-1), IND),
+            ('FONTNAME',(0,1),(0,-1),'Helvetica-Bold'),
+            ('FONTNAME',(2,1),(2,-1),'Helvetica-Bold'),
+            ('TEXTCOLOR',(1,1),(-1,-1), BLK),
+        ]))
+        story += [t2, Spacer(1, 20)]
+        story.append(Paragraph('<font color="#8487A0" size="9">Generated by ScoreVision · AI Student Performance Predictor</font>', styles['Normal']))
+
         doc.build(story)
         buf.seek(0)
-        return buf.read(), "pdf"
+        return buf.read()
     except ImportError:
-        # Fallback: matplotlib multi-page PNG as bytes
-        fig = make_result_figure(score, inputs, user)
+        fig = make_charts(score, inp, user)
         buf = io.BytesIO()
         fig.savefig(buf, format='pdf', bbox_inches='tight')
         plt.close(fig)
         buf.seek(0)
-        return buf.read(), "pdf"
-
-def make_result_figure(score, inputs, user=None):
-    is_dark = st.session_state.theme == "dark"
-    bg = '#0F0F1A' if is_dark else '#F8F9FF'
-    card = '#1A1A2E' if is_dark else '#FFFFFF'
-    text = '#E8E8FF' if is_dark else '#1A1A2E'
-    accent = '#818CF8' if is_dark else '#4F46E5'
-    sub = '#A0A0C0' if is_dark else '#555577'
-    success = '#34D399' if is_dark else '#059669'
-    warning = '#FBBF24' if is_dark else '#D97706'
-    danger = '#F87171' if is_dark else '#DC2626'
-    score_color = success if score >= 80 else warning if score >= 60 else danger
-    grade, emoji = get_grade(score)
-
-    fig = plt.figure(figsize=(14, 10), facecolor=bg)
-    gs = GridSpec(2, 3, figure=fig, hspace=0.45, wspace=0.35)
-
-    # ── Header ──
-    ax_title = fig.add_axes([0, 0.88, 1, 0.12], facecolor='none')
-    ax_title.axis('off')
-    ax_title.text(0.5, 0.85, '🎯 ScoreVision — Performance Report',
-                  ha='center', va='top', fontsize=18, fontweight='bold', color=accent,
-                  fontfamily='monospace')
-    name = user.get('name', '') if user else ''
-    ax_title.text(0.5, 0.3, f"Student: {name}  |  Date: {datetime.now().strftime('%d %b %Y')}",
-                  ha='center', va='top', fontsize=11, color=sub)
-
-    # ── 1. Score Gauge ──
-    ax1 = fig.add_subplot(gs[0, 0], facecolor=card)
-    theta = np.linspace(0, np.pi, 200)
-    ax1.plot(np.cos(theta), np.sin(theta), color=T['border'], lw=12, solid_capstyle='round')
-    fill_t = np.linspace(0, np.pi * (score / 100), 200)
-    ax1.plot(np.cos(fill_t), np.sin(fill_t), color=score_color, lw=12, solid_capstyle='round')
-    ax1.set_xlim(-1.4, 1.4); ax1.set_ylim(-0.3, 1.3)
-    ax1.axis('off')
-    ax1.text(0, 0.35, f"{score}", ha='center', va='center', fontsize=38,
-             fontweight='bold', color=score_color)
-    ax1.text(0, 0.08, f"Grade {grade} {emoji}", ha='center', va='center',
-             fontsize=13, color=text)
-    ax1.text(0, -0.18, "Predicted Score", ha='center', fontsize=10, color=sub)
-
-    # ── 2. Bar chart: numeric inputs ──
-    ax2 = fig.add_subplot(gs[0, 1], facecolor=card)
-    labels = ['Hours\nStudied', 'Attendance\n(%)', 'Previous\nScore', 'Sleep\nHours']
-    maxes = [24, 100, 100, 12]
-    vals = [inputs.get('hours',0), inputs.get('attendance',0),
-            inputs.get('previous',0), inputs.get('sleep',0)]
-    pcts = [v/m*100 for v, m in zip(vals, maxes)]
-    bar_colors = [accent, success, warning, '#A78BFA']
-    bars = ax2.barh(labels, pcts, color=bar_colors, height=0.55, alpha=0.88)
-    for bar, val in zip(bars, vals):
-        ax2.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2,
-                 f'{val}', va='center', ha='left', fontsize=10, color=text)
-    ax2.set_xlim(0, 115)
-    ax2.set_xlabel('% of Maximum', fontsize=9, color=sub)
-    ax2.set_facecolor(card)
-    ax2.tick_params(colors=text, labelsize=9)
-    ax2.spines[['top','right','bottom']].set_visible(False)
-    ax2.spines['left'].set_color(T['border'])
-    for spine in ax2.spines.values(): spine.set_color(T['border'])
-    ax2.set_title('Input Metrics', fontsize=11, color=text, fontweight='bold', pad=10)
-    ax2.xaxis.label.set_color(sub)
-
-    # ── 3. Radar chart ──
-    ax3 = fig.add_subplot(gs[0, 2], facecolor=card, polar=True)
-    cats = ['Hours', 'Attend', 'Prev Score', 'Sleep', 'Score']
-    norms = [inputs.get('hours',0)/24, inputs.get('attendance',0)/100,
-             inputs.get('previous',0)/100, inputs.get('sleep',0)/12, score/100]
-    N = len(cats)
-    angles = [n / float(N) * 2 * np.pi for n in range(N)]
-    angles += angles[:1]
-    norms += norms[:1]
-    ax3.set_facecolor(card)
-    ax3.plot(angles, norms, 'o-', lw=2, color=accent, markersize=5)
-    ax3.fill(angles, norms, alpha=0.25, color=accent)
-    ax3.set_xticks(angles[:-1])
-    ax3.set_xticklabels(cats, size=9, color=text)
-    ax3.set_yticks([0.25, 0.5, 0.75, 1.0])
-    ax3.set_yticklabels(['25%','50%','75%','100%'], size=7, color=sub)
-    ax3.tick_params(colors=text)
-    ax3.spines['polar'].set_color(T['border'])
-    ax3.set_title('Performance Radar', fontsize=11, color=text,
-                  fontweight='bold', pad=15)
-    ax3.grid(color=T['border'], alpha=0.4)
-
-    # ── 4. Qualitative factors ──
-    ax4 = fig.add_subplot(gs[1, :2], facecolor=card)
-    qual_map = {
-        'Motivation': {'Low':1,'Medium':2,'High':3},
-        'Teacher Quality': {'Poor':1,'Average':2,'Good':3},
-        'Peer Influence': {'Negative':1,'Neutral':2,'Positive':3},
-        'Resources': {'Low':1,'Medium':2,'High':3},
-        'Family Income': {'Low':1,'Medium':2,'High':3},
-        'Parent Involvement': {'Low':1,'Medium':2,'High':3},
-    }
-    keys = ['motivation','teacher','peer','resources','income','parent']
-    vals_qual = [qual_map[list(qual_map.keys())[i]].get(
-                  str(inputs.get(keys[i],'')), 1) for i in range(len(keys))]
-    x = np.arange(len(qual_map))
-    ql = list(qual_map.keys())
-    bcolors = [success if v==3 else warning if v==2 else danger for v in vals_qual]
-    ax4.bar(x, vals_qual, color=bcolors, width=0.5, alpha=0.85)
-    ax4.set_xticks(x)
-    ax4.set_xticklabels(ql, fontsize=9, color=text)
-    ax4.set_yticks([1,2,3])
-    ax4.set_yticklabels(['Low','Medium','High'], fontsize=9, color=sub)
-    ax4.set_facecolor(card)
-    ax4.spines[['top','right']].set_visible(False)
-    ax4.spines[['left','bottom']].set_color(T['border'])
-    ax4.tick_params(colors=text)
-    ax4.set_title('Qualitative Factor Analysis', fontsize=11, color=text,
-                  fontweight='bold', pad=10)
-    legend_els = [mpatches.Patch(color=success,label='High/Positive'),
-                  mpatches.Patch(color=warning,label='Medium/Neutral'),
-                  mpatches.Patch(color=danger,label='Low/Negative')]
-    ax4.legend(handles=legend_els, fontsize=8, loc='upper right',
-               facecolor=card, labelcolor=text, edgecolor=T['border'])
-
-    # ── 5. Score band ──
-    ax5 = fig.add_subplot(gs[1, 2], facecolor=card)
-    bands = ['F\n(0-49)', 'D\n(50-59)', 'C\n(60-69)', 'B\n(70-79)', 'A\n(80-89)', 'A+\n(90-100)']
-    band_colors = [danger, '#FB923C', warning, '#A3E635', success, '#22D3EE']
-    ys = [1]*6
-    bars5 = ax5.barh(bands, ys, color=band_colors, alpha=0.55, height=0.7)
-    band_scores = [25, 55, 65, 75, 85, 95]
-    cur_band = 0
-    for i, bs in enumerate(band_scores):
-        if score <= bs + 5 and cur_band == 0:
-            cur_band = i
-    actual_band = min(5, max(0, (score - 0) // 10 - 4 + 1))
-    if score < 50: actual_band = 0
-    elif score < 60: actual_band = 1
-    elif score < 70: actual_band = 2
-    elif score < 80: actual_band = 3
-    elif score < 90: actual_band = 4
-    else: actual_band = 5
-    ax5.barh(bands[actual_band], 1, color=score_color, height=0.7, alpha=1.0)
-    ax5.text(0.5, bands[actual_band], f'  ◀ You ({score})', va='center',
-             fontsize=9, color=text, fontweight='bold')
-    ax5.axis('off')
-    ax5.set_title('Grade Band', fontsize=11, color=text, fontweight='bold', pad=10)
-
-    fig.patch.set_alpha(1)
-    plt.tight_layout(rect=[0, 0, 1, 0.87])
-    return fig
+        return buf.read()
 
 
-# ─────────────────────────────────────────────
-# PAGES
-# ─────────────────────────────────────────────
-
-def page_landing():
-    inject_css(T)
-    # Hero
-    st.markdown(f"""
-    <div class="sv-hero">
-        <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
-            <span style="font-size:48px;">🎯</span>
-            <div>
-                <h1 style="margin:0;font-size:36px;letter-spacing:-0.5px;">ScoreVision</h1>
-                <p style="margin:0;opacity:0.85;font-size:16px;">AI-Powered Student Performance Predictor</p>
-            </div>
-        </div>
-        <p style="font-size:15px;opacity:0.9;max-width:600px;margin-top:16px;line-height:1.7;">
-            Unlock your academic potential with intelligent score predictions, 
-            detailed performance analytics, and professional PDF reports — 
-            all in one beautiful dashboard.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Features
-    cols = st.columns(3)
-    features = [
-        ("🔮", "Smart Predictions", "AI model trained on real student data predicts your exam score with high accuracy."),
-        ("📊", "Visual Analytics", "Beautiful charts and radar graphs show your strengths and improvement areas."),
-        ("📄", "PDF Reports", "Download professional reports with graphs. Share directly on WhatsApp."),
-    ]
-    for col, (icon, title, desc) in zip(cols, features):
-        with col:
-            st.markdown(f"""
-            <div class="sv-card" style="text-align:center;min-height:160px;">
-                <div style="font-size:36px;margin-bottom:12px;">{icon}</div>
-                <h3 style="margin:0 0 8px;font-size:16px;color:{T['accent']};">{title}</h3>
-                <p style="font-size:13px;color:{T['subtext']};line-height:1.6;margin:0;">{desc}</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown(f"""
-        <div style="background:{T['metric_bg']};border:1px solid {T['border']};border-radius:16px;padding:24px;text-align:center;">
-            <p style="color:{T['subtext']};font-size:13px;margin-bottom:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Get Started</p>
-        """, unsafe_allow_html=True)
-        if st.button("🚀  Login / Sign Up", use_container_width=True):
-            st.session_state.page = "auth"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div style="text-align:center;margin-top:40px;color:{T['muted']};font-size:12px;">
-        © 2025 ScoreVision · Built with ❤️ for Students & Parents
-    </div>
-    """, unsafe_allow_html=True)
-
-
-def page_auth():
-    inject_css(T)
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown(f"""
-        <div style="text-align:center;margin-bottom:32px;">
-            <span style="font-size:48px;">🎯</span>
-            <h1 style="font-size:28px;margin:8px 0 4px;color:{T['accent']};">ScoreVision</h1>
-            <p style="color:{T['subtext']};font-size:14px;">Sign in or create your account</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        tab1, tab2 = st.tabs(["🔑  Login", "✨  Sign Up"])
-
-        with tab1:
-            st.markdown("<br>", unsafe_allow_html=True)
-            email = st.text_input("Email Address", key="login_email", placeholder="you@example.com")
-            password = st.text_input("Password", type="password", key="login_pass", placeholder="••••••••")
-            if st.button("Login", use_container_width=True, key="btn_login"):
-                if email in st.session_state.users:
-                    u = st.session_state.users[email]
-                    if u['password'] == password:
-                        st.session_state.logged_in = True
-                        st.session_state.current_user = email
-                        st.session_state.page = "dashboard"
-                        st.rerun()
-                    else:
-                        st.error("❌ Incorrect password.")
-                else:
-                    st.error("❌ Account not found. Please sign up first.")
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("← Back to Home", key="back_login"):
-                st.session_state.page = "landing"
-                st.rerun()
-
-        with tab2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            role = st.selectbox("I am a", ["Student", "Parent"], key="reg_role")
-            name = st.text_input("Full Name", key="reg_name", placeholder="Arjun Sharma")
-            reg_email = st.text_input("Email Address", key="reg_email", placeholder="you@example.com")
-            reg_pass = st.text_input("Password", type="password", key="reg_pass", placeholder="Min 6 characters")
-            reg_pass2 = st.text_input("Confirm Password", type="password", key="reg_pass2", placeholder="Repeat password")
-            dob = st.date_input("Date of Birth", key="reg_dob",
-                                min_value=date(1990, 1, 1), max_value=date.today(),
-                                value=date(2005, 6, 15))
-            class_std = st.text_input("Class / Standard", key="reg_class", placeholder="e.g. Class 10, Grade 11")
-            school_name = st.text_input("School / College Name", key="reg_school",
-                                        placeholder="e.g. Delhi Public School")
-            city = st.text_input("City", key="reg_city", placeholder="e.g. Mumbai")
-            phone = st.text_input("Phone Number (optional)", key="reg_phone", placeholder="+91 9876543210")
-
-            if st.button("Create Account", use_container_width=True, key="btn_signup"):
-                errors = []
-                if not name.strip(): errors.append("Name is required.")
-                if not reg_email.strip() or "@" not in reg_email: errors.append("Valid email required.")
-                if len(reg_pass) < 6: errors.append("Password must be at least 6 characters.")
-                if reg_pass != reg_pass2: errors.append("Passwords do not match.")
-                if not class_std.strip(): errors.append("Class/Standard is required.")
-                if not school_name.strip(): errors.append("School/College name is required.")
-                if reg_email in st.session_state.users: errors.append("Email already registered.")
-                if errors:
-                    for e in errors: st.error(f"❌ {e}")
-                else:
-                    st.session_state.users[reg_email] = {
-                        "name": name.strip(),
-                        "email": reg_email.strip(),
-                        "password": reg_pass,
-                        "role": role.lower(),
-                        "dob": str(dob),
-                        "class_std": class_std.strip(),
-                        "school_name": school_name.strip(),
-                        "city": city.strip(),
-                        "phone": phone.strip(),
-                        "photo": None,
-                        "joined": datetime.now().strftime("%d %B %Y"),
-                    }
-                    st.session_state.logged_in = True
-                    st.session_state.current_user = reg_email
-                    st.session_state.page = "dashboard"
-                    st.success("✅ Account created! Welcome to ScoreVision.")
-                    st.rerun()
-
-
-def page_dashboard():
-    inject_css(T)
-    user = st.session_state.users.get(st.session_state.current_user, {})
-    name = user.get('name', 'User')
-    role_tag = user.get('role', 'student').capitalize()
-
-    st.markdown(f"""
-    <div class="sv-hero">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
-            <div>
-                <span class="sv-tag">{role_tag}</span>
-                <h1 style="margin:10px 0 4px;font-size:28px;">Welcome back, {name.split()[0]}! 👋</h1>
-                <p style="opacity:0.85;margin:0;font-size:14px;">
-                    {user.get('school_name','—')} · Class {user.get('class_std','—')} · {user.get('city','')}
-                </p>
-            </div>
-            <div style="text-align:right;">
-                <p style="opacity:0.7;margin:0;font-size:12px;">Joined {user.get('joined','—')}</p>
-                <p style="opacity:0.7;margin:0;font-size:12px;">DOB: {user.get('dob','—')}</p>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Quick stats
-    history = st.session_state.history
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.metric("Total Predictions", len(history))
-    with c2:
-        avg = int(np.mean([h['score'] for h in history])) if history else 0
-        st.metric("Average Score", f"{avg}/100" if history else "—")
-    with c3:
-        best = max([h['score'] for h in history]) if history else 0
-        st.metric("Best Score", f"{best}/100" if history else "—")
-    with c4:
-        grade, emoji = get_grade(avg) if history else ("—", "")
-        st.metric("Current Grade", f"{grade} {emoji}" if history else "—")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # CTA
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"""
-        <div class="sv-card" style="text-align:center;padding:32px;">
-            <div style="font-size:40px;margin-bottom:12px;">🔮</div>
-            <h3 style="color:{T['accent']};margin-bottom:8px;">Predict Your Score</h3>
-            <p style="color:{T['subtext']};font-size:13px;">Fill in your study habits and get an AI-powered exam score prediction.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Start Prediction →", use_container_width=True, key="goto_pred"):
-            st.session_state.page = "predict"
-            st.rerun()
-
-    with c2:
-        st.markdown(f"""
-        <div class="sv-card" style="text-align:center;padding:32px;">
-            <div style="font-size:40px;margin-bottom:12px;">📊</div>
-            <h3 style="color:{T['accent']};margin-bottom:8px;">View Results</h3>
-            <p style="color:{T['subtext']};font-size:13px;">See detailed graphs, grade breakdown, and download your PDF report.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("View Results →", use_container_width=True, key="goto_results"):
-            st.session_state.page = "results"
-            st.rerun()
-
-    # Recent history
-    if history:
-        st.markdown(f"<br><div class='sv-section-title'>Recent Predictions</div>", unsafe_allow_html=True)
-        for h in reversed(history[-5:]):
-            g, e = get_grade(h['score'])
-            col = grade_color(h['score'])
-            st.markdown(f"""
-            <div class="sv-card" style="display:flex;justify-content:space-between;align-items:center;padding:16px 24px;margin-bottom:10px;">
-                <div>
-                    <span style="font-size:13px;color:{T['subtext']};">{h['time']}</span>
-                    <p style="margin:4px 0 0;font-size:14px;color:{T['text']};">
-                        Hours: {h['inputs'].get('hours',0)} | Attendance: {h['inputs'].get('attendance',0)}% | Prev: {h['inputs'].get('previous',0)}
-                    </p>
-                </div>
-                <div style="text-align:right;">
-                    <span style="font-size:28px;font-weight:700;color:{col};">{h['score']}</span>
-                    <span style="font-size:16px;color:{col};"> {e}</span>
-                    <p style="margin:0;font-size:12px;color:{T['subtext']};">Grade {g}</p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-
-def page_predict():
-    inject_css(T)
-    model, columns = load_model()
-
-    st.markdown(f"""
-    <div class="sv-hero">
-        <h1 style="margin:0 0 8px;font-size:26px;">🔮 Score Predictor</h1>
-        <p style="opacity:0.85;margin:0;">Fill in the details below — all fields start at 0.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    if model is None:
-        st.warning("⚠️ Model file not found. Make sure `student_model.pkl` and `model_columns.pkl` are in the same directory as this app.")
-        return
-
-    st.markdown(f"<div class='sv-section-title'>📐 Numeric Inputs</div>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        hours = st.number_input("Hours Studied (per day)", min_value=0, max_value=24, value=0, step=1)
-        sleep = st.number_input("Sleep Hours (per night)", min_value=0, max_value=24, value=0, step=1)
-    with col2:
-        attendance = st.number_input("Attendance (%)", min_value=0, max_value=100, value=0, step=1)
-        previous = st.number_input("Previous Exam Score", min_value=0, max_value=100, value=0, step=1)
-
-    # Validation
-    if hours + sleep > 24:
-        st.error(f"⏰ Hours Studied ({hours}h) + Sleep Hours ({sleep}h) = {hours+sleep}h exceeds 24 hours in a day! Please reduce one of them.")
-        return
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f"<div class='sv-section-title'>🧩 Qualitative Factors</div>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        motivation = st.selectbox("Motivation Level", ["Low", "Medium", "High"])
-        teacher = st.selectbox("Teacher Quality", ["Poor", "Average", "Good"])
-        school = st.selectbox("School Type", ["Public", "Private"])
-        internet = st.selectbox("Internet Access", ["Yes", "No"])
-        resources = st.selectbox("Learning Resources", ["Low", "Medium", "High"])
-    with c2:
-        income = st.selectbox("Family Income", ["Low", "Medium", "High"])
-        parent = st.selectbox("Parental Involvement", ["Low", "Medium", "High"])
-        education = st.selectbox("Parent Education", ["School", "College"])
-        peer = st.selectbox("Peer Influence", ["Negative", "Neutral", "Positive"])
-        activities = st.selectbox("Extracurricular Activities", ["Yes", "No"])
-    with c3:
-        st.markdown(f"""
-        <div class="sv-card" style="padding:20px;">
-            <div class="sv-section-title">Summary</div>
-            <p style="font-size:13px;color:{T['subtext']};line-height:1.8;">
-            📚 Study: <b style="color:{T['text']}">{hours}h/day</b><br>
-            😴 Sleep: <b style="color:{T['text']}">{sleep}h/night</b><br>
-            📅 Attend: <b style="color:{T['text']}">{attendance}%</b><br>
-            📝 Prev: <b style="color:{T['text']}">{previous}/100</b><br>
-            💡 Motivation: <b style="color:{T['text']}">{motivation}</b><br>
-            🌐 Internet: <b style="color:{T['text']}">{internet}</b><br>
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚀  Predict My Score", use_container_width=True):
-        inputs = dict(hours=hours, attendance=attendance, previous=previous,
-                      sleep=sleep, motivation=motivation, teacher=teacher,
-                      school=school, internet=internet, income=income,
-                      parent=parent, education=education, peer=peer,
-                      resources=resources, activities=activities)
-        score = predict_score(inputs, model, columns)
-        st.session_state.prediction_result = score
-        st.session_state.prediction_inputs = inputs
-        st.session_state.history.append({
-            "score": score, "inputs": inputs,
-            "time": datetime.now().strftime("%d %b %Y, %H:%M")
-        })
-        st.session_state.page = "results"
-        st.rerun()
-
-
-def page_results():
-    inject_css(T)
-    score = st.session_state.prediction_result
-    inputs = st.session_state.prediction_inputs
-    user = st.session_state.users.get(st.session_state.current_user, {})
-
-    if score is None or inputs is None:
-        st.warning("No prediction found. Please run the predictor first.")
-        if st.button("Go to Predictor"):
-            st.session_state.page = "predict"
-            st.rerun()
-        return
-
-    grade, emoji = get_grade(score)
-    col = grade_color(score)
-
-    st.markdown(f"""
-    <div class="sv-hero">
-        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
-            <div style="font-size:72px;line-height:1;">{emoji}</div>
-            <div>
-                <h1 style="margin:0 0 4px;font-size:32px;">Your Score: {score}/100</h1>
-                <p style="opacity:0.85;margin:0 0 8px;">Grade <b>{grade}</b> — {user.get('name','')}</p>
-                <span style="background:rgba(255,255,255,0.2);padding:4px 14px;border-radius:20px;font-size:13px;">
-                    {user.get('school_name','')} · Class {user.get('class_std','')}
-                </span>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Graphs
-    st.markdown(f"<div class='sv-section-title'>📊 Performance Analytics</div>", unsafe_allow_html=True)
-    fig = make_result_figure(score, inputs, user)
-    st.pyplot(fig, use_container_width=True)
-    plt.close(fig)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Download & Share
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        pdf_bytes, _ = make_report_pdf(user, score, inputs)
-        st.download_button(
-            label="📥  Download PDF Report",
-            data=pdf_bytes,
-            file_name=f"ScoreVision_Report_{user.get('name','').replace(' ','_')}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
-    with c2:
-        msg = (f"🎯 ScoreVision Report%0A"
-               f"Student: {user.get('name','')}%0A"
-               f"Predicted Score: {score}/100%0A"
-               f"Grade: {grade} {emoji}%0A"
-               f"School: {user.get('school_name','')}%0A"
-               f"Download & analyse your full report on ScoreVision!")
-        wa_url = f"https://wa.me/?text={msg}"
-        st.markdown(f"""
-        <a href="{wa_url}" target="_blank" style="text-decoration:none;">
-            <div style="background:#25D366;color:#fff;border-radius:12px;padding:10px 16px;
-                        text-align:center;font-weight:600;font-size:14px;cursor:pointer;
-                        box-shadow:0 4px 12px rgba(37,211,102,0.3);">
-                📲  Share on WhatsApp
-            </div>
-        </a>
-        """, unsafe_allow_html=True)
-    with c3:
-        if st.button("🔄  New Prediction", use_container_width=True):
-            st.session_state.page = "predict"
-            st.rerun()
-
-    # Input summary table
-    st.markdown(f"<br><div class='sv-section-title'>📋 Input Summary</div>", unsafe_allow_html=True)
-    summary_data = {
-        "Parameter": ["Hours Studied", "Attendance", "Previous Score", "Sleep Hours",
-                       "Motivation", "Teacher Quality", "School Type", "Internet",
-                       "Family Income", "Parental Involvement", "Parent Education",
-                       "Peer Influence", "Learning Resources", "Extracurricular"],
-        "Your Value": [inputs.get('hours'), inputs.get('attendance'), inputs.get('previous'),
-                        inputs.get('sleep'), inputs.get('motivation'), inputs.get('teacher'),
-                        inputs.get('school'), inputs.get('internet'), inputs.get('income'),
-                        inputs.get('parent'), inputs.get('education'), inputs.get('peer'),
-                        inputs.get('resources'), inputs.get('activities')]
-    }
-    st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
-
-
-def page_profile():
-    inject_css(T)
-    user = st.session_state.users.get(st.session_state.current_user, {})
-
-    st.markdown(f"""
-    <div class="sv-hero">
-        <h1 style="margin:0 0 4px;font-size:26px;">👤 Edit Profile</h1>
-        <p style="opacity:0.85;margin:0;">Update your personal information</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        st.markdown(f"""
-        <div class="sv-card" style="text-align:center;padding:32px;">
-        """, unsafe_allow_html=True)
-        photo_file = st.file_uploader("Upload Profile Photo", type=["png","jpg","jpeg"], key="photo_up")
-        if photo_file:
-            img_bytes = photo_file.read()
-            b64 = base64.b64encode(img_bytes).decode()
-            ext = photo_file.name.split('.')[-1]
-            st.session_state.users[st.session_state.current_user]['photo'] = f"data:image/{ext};base64,{b64}"
-        if user.get('photo'):
-            st.markdown(f'<img src="{user["photo"]}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid {T["accent"]};margin-bottom:12px;" />', unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div style="width:100px;height:100px;border-radius:50%;background:{T['metric_bg']};
-                        display:flex;align-items:center;justify-content:center;
-                        font-size:40px;margin:0 auto 12px;border:3px solid {T['border']};">
-                👤
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown(f"""
-            <p style="font-weight:600;color:{T['text']};margin:0;">{user.get('name','')}</p>
-            <p style="color:{T['subtext']};font-size:13px;">{user.get('role','').capitalize()}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with c2:
-        with st.form("profile_form"):
-            name = st.text_input("Full Name", value=user.get('name',''))
-            class_std = st.text_input("Class / Standard", value=user.get('class_std',''))
-            school_name = st.text_input("School / College", value=user.get('school_name',''))
-            city = st.text_input("City", value=user.get('city',''))
-            phone = st.text_input("Phone Number", value=user.get('phone',''))
-            dob = st.text_input("Date of Birth (YYYY-MM-DD)", value=user.get('dob',''))
-            submitted = st.form_submit_button("💾  Save Changes", use_container_width=True)
-            if submitted:
-                st.session_state.users[st.session_state.current_user].update({
-                    "name": name.strip(),
-                    "class_std": class_std.strip(),
-                    "school_name": school_name.strip(),
-                    "city": city.strip(),
-                    "phone": phone.strip(),
-                    "dob": dob.strip(),
-                })
-                st.success("✅ Profile updated successfully!")
-                st.rerun()
-
-
-# ─────────────────────────────────────────────
-# SIDEBAR NAVIGATION
-# ─────────────────────────────────────────────
-def sidebar_nav():
-    inject_css(T)
+# ══════════════════════════════════════════════════════
+#  SIDEBAR
+# ══════════════════════════════════════════════════════
+def sidebar():
     with st.sidebar:
         st.markdown(f"""
-        <div style="text-align:center;padding:20px 0 16px;">
-            <span style="font-size:36px;">🎯</span>
-            <h2 style="margin:8px 0 2px;font-size:20px;font-family:'Space Grotesk',sans-serif;color:{T['accent']};">ScoreVision</h2>
-            <p style="font-size:11px;color:{T['muted']};margin:0;">AI Student Analytics</p>
+        <div style="padding:24px 20px 12px;text-align:center;">
+            <div style="font-size:44px;margin-bottom:6px;">🎯</div>
+            <div style="font-size:22px;font-weight:700;color:{T['accent']};font-family:'Outfit',sans-serif;">ScoreVision</div>
+            <div style="font-size:11px;color:{T['text3']};letter-spacing:0.08em;text-transform:uppercase;margin-top:2px;">AI Performance Analytics</div>
         </div>
-        <hr style="border-color:{T['divider']};margin:0 0 16px;">
+        <hr style="border-color:{T['border']};margin:0 0 14px;">
         """, unsafe_allow_html=True)
 
         if st.session_state.logged_in:
             user = st.session_state.users.get(st.session_state.current_user, {})
+            initials = ''.join([w[0].upper() for w in user.get('name','U').split()[:2]])
             if user.get('photo'):
                 st.markdown(f"""
-                <div style="text-align:center;margin-bottom:12px;">
-                    <img src="{user['photo']}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid {T['accent']};"/>
-                    <p style="margin:6px 0 0;font-weight:600;font-size:14px;color:{T['text']};">{user.get('name','')}</p>
-                    <p style="font-size:11px;color:{T['muted']};margin:0;">{user.get('email','')}</p>
+                <div style="text-align:center;padding:8px 0 16px;">
+                    <img src="{user['photo']}" style="width:60px;height:60px;border-radius:50%;
+                         object-fit:cover;border:2.5px solid {T['accent']};" />
+                    <p style="margin:8px 0 2px;font-weight:600;font-size:14px;color:{T['text']};">{user.get('name','')}</p>
+                    <span style="font-size:11px;color:{T['text3']};">{user.get('role','').capitalize()} · {user.get('class_std','')}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div style="text-align:center;padding:8px 0 16px;">
+                    <div style="width:60px;height:60px;border-radius:50%;
+                         background:linear-gradient(135deg,{T['grad_a']},{T['grad_b']});
+                         display:flex;align-items:center;justify-content:center;
+                         font-size:20px;font-weight:700;color:#fff;margin:0 auto 8px;">
+                         {initials}
+                    </div>
+                    <p style="margin:0 0 2px;font-weight:600;font-size:14px;color:{T['text']};">{user.get('name','')}</p>
+                    <span style="font-size:11px;color:{T['text3']};">{user.get('role','').capitalize()} · {user.get('class_std','')}</span>
                 </div>
                 """, unsafe_allow_html=True)
 
-            nav_items = [
-                ("🏠", "Dashboard", "dashboard"),
-                ("🔮", "Predict Score", "predict"),
-                ("📊", "Results", "results"),
-                ("👤", "Edit Profile", "profile"),
-            ]
-            for icon, label, page_key in nav_items:
-                is_active = st.session_state.page == page_key
-                btn_style = f"background:{T['metric_bg']};border-left:3px solid {T['accent']};" if is_active else ""
-                if st.button(f"{icon}  {label}", key=f"nav_{page_key}", use_container_width=True):
-                    st.session_state.page = page_key
-                    st.rerun()
+            nav = [("🏠","Dashboard","dashboard"),("🔮","Predict Score","predict"),
+                   ("📊","Results","results"),("👤","Edit Profile","profile")]
+            for icon, label, key in nav:
+                active = st.session_state.page == key
+                if st.button(f"{icon}  {label}", key=f"nav_{key}", use_container_width=True):
+                    st.session_state.page = key; st.rerun()
 
-            st.markdown(f"<hr style='border-color:{T['divider']};margin:16px 0;'>", unsafe_allow_html=True)
+            st.markdown(f"<hr style='border-color:{T['border']};margin:12px 0;'>", unsafe_allow_html=True)
 
         # Theme toggle
-        theme_label = "🌙  Dark Mode" if st.session_state.theme == "light" else "☀️  Light Mode"
-        if st.button(theme_label, use_container_width=True, key="theme_toggle"):
+        tog_lbl = "☀️  Light Mode" if st.session_state.theme == "dark" else "🌙  Dark Mode"
+        if st.button(tog_lbl, use_container_width=True, key="theme_tog"):
             st.session_state.theme = "dark" if st.session_state.theme == "light" else "light"
             st.rerun()
 
         if st.session_state.logged_in:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🚪  Logout", use_container_width=True, key="logout"):
-                st.session_state.logged_in = False
-                st.session_state.current_user = None
+            if st.button("🚪  Logout", use_container_width=True, key="logout_btn"):
+                for k in ["logged_in","current_user","prediction_result","prediction_inputs"]:
+                    st.session_state[k] = False if k=="logged_in" else None
+                st.session_state.history = []
                 st.session_state.page = "landing"
-                st.session_state.prediction_result = None
-                st.session_state.prediction_inputs = None
                 st.rerun()
 
         st.markdown(f"""
-        <div style="position:fixed;bottom:20px;left:0;width:100%;text-align:center;">
-            <p style="font-size:10px;color:{T['muted']};margin:0;">© 2025 ScoreVision</p>
+        <div style="position:absolute;bottom:18px;left:0;width:100%;text-align:center;">
+            <p style="font-size:10px;color:{T['text3']};margin:0;">© 2025 ScoreVision</p>
         </div>
         """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────
-# ROUTER
-# ─────────────────────────────────────────────
-def main():
-    if st.session_state.page in ["landing", "auth"]:
-        # Minimal sidebar for public pages
-        with st.sidebar:
-            theme_label = "🌙  Dark Mode" if st.session_state.theme == "light" else "☀️  Light Mode"
-            if st.button(theme_label, use_container_width=True, key="theme_pub"):
-                st.session_state.theme = "dark" if st.session_state.theme == "light" else "light"
+# ══════════════════════════════════════════════════════
+#  PAGE: LANDING
+# ══════════════════════════════════════════════════════
+def page_landing():
+    st.markdown(f"""
+    <div class="sv-hero">
+        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+            <div>
+                <div class="sv-pill" style="margin-bottom:12px;">✨ AI-Powered · Free · Instant</div>
+                <h1 style="margin:0 0 8px;font-size:38px;font-weight:700;color:#fff;letter-spacing:-0.5px;font-family:'Outfit',sans-serif;">
+                    Predict. Analyse. Improve.
+                </h1>
+                <p style="margin:0;font-size:16px;color:rgba(255,255,255,0.82);max-width:520px;line-height:1.65;">
+                    ScoreVision uses machine learning to predict your exam scores,
+                    visualise your study patterns, and generate professional PDF reports
+                    — all in seconds.
+                </p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3, gap="medium")
+    cards = [
+        ("🔮","Smart Prediction","AI model analyses 14 factors — study hours, attendance, motivation & more — to predict your exact exam score."),
+        ("📊","Rich Analytics","5 interactive charts: score gauge, radar, bar, qualitative analysis & grade band — all in one report."),
+        ("📄","PDF + WhatsApp","Download a beautifully formatted PDF report with all charts, or share your score directly on WhatsApp."),
+    ]
+    for col, (ico, ttl, dsc) in zip([c1,c2,c3], cards):
+        with col:
+            st.markdown(f"""
+            <div class="sv-card" style="text-align:center;min-height:190px;">
+                <div style="font-size:38px;margin-bottom:14px;">{ico}</div>
+                <h3 style="margin:0 0 8px;font-size:16px;color:{T['accent']};font-family:'Outfit',sans-serif;">{ttl}</h3>
+                <p style="font-size:13px;color:{T['text2']};line-height:1.65;margin:0;">{dsc}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    _, mc, _ = st.columns([1.5,2,1.5])
+    with mc:
+        if st.button("🚀  Get Started — It's Free", use_container_width=True, key="landing_cta"):
+            st.session_state.page = "auth"; st.rerun()
+
+    st.markdown(f"""
+    <p style="text-align:center;margin-top:32px;color:{T['text3']};font-size:12px;">
+        Trusted by students & parents · No subscription required
+    </p>
+    """, unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════
+#  PAGE: AUTH
+# ══════════════════════════════════════════════════════
+def page_auth():
+    _, mc, _ = st.columns([1, 2, 1])
+    with mc:
+        st.markdown(f"""
+        <div style="text-align:center;margin-bottom:28px;">
+            <div style="font-size:44px;">🎯</div>
+            <h1 style="font-size:28px;margin:8px 0 4px;color:{T['accent']};font-family:'Outfit',sans-serif;">ScoreVision</h1>
+            <p style="color:{T['text2']};font-size:14px;margin:0;">Sign in or create your account</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        tab_login, tab_signup = st.tabs(["🔑  Login", "✨  Sign Up"])
+
+        # ── LOGIN ──────────────────────────────────
+        with tab_login:
+            st.markdown("<br>", unsafe_allow_html=True)
+            email    = st.text_input("Email Address", key="li_email", placeholder="you@example.com")
+            password = st.text_input("Password", type="password", key="li_pass", placeholder="••••••••")
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Login →", use_container_width=True, key="btn_login"):
+                users = st.session_state.users
+                if email not in users:
+                    st.error("❌ No account found with this email. Please sign up.")
+                elif users[email]['password'] != password:
+                    st.error("❌ Incorrect password. Please try again.")
+                else:
+                    st.session_state.logged_in    = True
+                    st.session_state.current_user = email
+                    st.session_state.page         = "dashboard"
+                    st.rerun()
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("← Back to Home", key="back_li"):
+                st.session_state.page = "landing"; st.rerun()
+
+        # ── SIGN UP ────────────────────────────────
+        with tab_signup:
+            st.markdown("<br>", unsafe_allow_html=True)
+            role       = st.selectbox("I am a", ["Student","Parent"], key="su_role")
+            name       = st.text_input("Full Name *", key="su_name",  placeholder="Arjun Sharma")
+            su_email   = st.text_input("Email Address *", key="su_email", placeholder="you@example.com")
+            su_pass    = st.text_input("Password *", type="password", key="su_pass",  placeholder="Minimum 6 characters")
+            su_pass2   = st.text_input("Confirm Password *", type="password", key="su_pass2", placeholder="Repeat password")
+
+            c1, c2 = st.columns(2)
+            with c1:
+                dob = st.date_input("Date of Birth *", key="su_dob",
+                                    min_value=date(1980,1,1), max_value=date.today(),
+                                    value=date(2007,1,1))
+            with c2:
+                class_std = st.selectbox("Class / Standard *", CLASS_OPTIONS, key="su_class")
+
+            school_name = st.text_input("School / College Name *", key="su_school",
+                                        placeholder="e.g. Delhi Public School, RK Nagar")
+            c3, c4 = st.columns(2)
+            with c3:
+                city  = st.text_input("City *", key="su_city", placeholder="Mumbai")
+            with c4:
+                phone = st.text_input("Phone (optional)", key="su_phone", placeholder="+91 98765 43210")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Create Account →", use_container_width=True, key="btn_signup"):
+                errs = []
+                if not name.strip():                        errs.append("Full name is required.")
+                if not su_email.strip() or "@" not in su_email: errs.append("A valid email is required.")
+                if len(su_pass) < 6:                        errs.append("Password must be at least 6 characters.")
+                if su_pass != su_pass2:                     errs.append("Passwords do not match.")
+                if not school_name.strip():                 errs.append("School/College name is required.")
+                if not city.strip():                        errs.append("City is required.")
+                if su_email in st.session_state.users:      errs.append("This email is already registered.")
+                if errs:
+                    for e in errs: st.error(f"❌ {e}")
+                else:
+                    st.session_state.users[su_email] = {
+                        "name": name.strip(), "email": su_email.strip(),
+                        "password": su_pass, "role": role.lower(),
+                        "dob": str(dob), "class_std": class_std,
+                        "school_name": school_name.strip(), "city": city.strip(),
+                        "phone": phone.strip(), "photo": None,
+                        "joined": datetime.now().strftime("%d %B %Y"),
+                    }
+                    st.session_state.logged_in    = True
+                    st.session_state.current_user = su_email
+                    st.session_state.page         = "dashboard"
+                    st.success("✅ Welcome to ScoreVision!")
+                    st.rerun()
+
+
+# ══════════════════════════════════════════════════════
+#  PAGE: DASHBOARD
+# ══════════════════════════════════════════════════════
+def page_dashboard():
+    user    = st.session_state.users.get(st.session_state.current_user, {})
+    name    = user.get('name','User')
+    history = st.session_state.history
+    scores  = [h['score'] for h in history]
+
+    st.markdown(f"""
+    <div class="sv-hero">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+            <div>
+                <div class="sv-pill" style="margin-bottom:10px;">{user.get('role','student').capitalize()}</div>
+                <h1 style="margin:0 0 6px;font-size:30px;color:#fff;font-family:'Outfit',sans-serif;font-weight:700;">
+                    Welcome back, {name.split()[0]}! 👋
+                </h1>
+                <p style="margin:0;color:rgba(255,255,255,0.80);font-size:14px;">
+                    {user.get('school_name','—')} &nbsp;·&nbsp; {user.get('class_std','—')} &nbsp;·&nbsp; {user.get('city','')}
+                </p>
+            </div>
+            <div style="text-align:right;">
+                <p style="color:rgba(255,255,255,0.65);font-size:12px;margin:0;">Joined {user.get('joined','—')}</p>
+                <p style="color:rgba(255,255,255,0.65);font-size:12px;margin:4px 0 0;">DOB: {user.get('dob','—')}</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    m1, m2, m3, m4 = st.columns(4)
+    avg   = int(np.mean(scores)) if scores else 0
+    best  = max(scores) if scores else 0
+    g, e, _ = get_grade(avg) if scores else ("—","","")
+    with m1: st.metric("Total Predictions", len(history))
+    with m2: st.metric("Average Score", f"{avg}/100" if scores else "—")
+    with m3: st.metric("Best Score", f"{best}/100" if scores else "—")
+    with m4: st.metric("Current Grade", f"{g} {e}" if scores else "—")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2, gap="medium")
+    with c1:
+        st.markdown(f"""
+        <div class="sv-card" style="text-align:center;padding:36px 28px;">
+            <div style="font-size:44px;margin-bottom:14px;">🔮</div>
+            <h3 style="color:{T['accent']};margin:0 0 8px;font-size:18px;">Predict Your Score</h3>
+            <p style="color:{T['text2']};font-size:13px;margin:0 0 20px;line-height:1.6;">
+                Fill in your study habits and get an AI-powered exam score prediction instantly.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Start Prediction →", use_container_width=True, key="d_pred"):
+            st.session_state.page = "predict"; st.rerun()
+
+    with c2:
+        st.markdown(f"""
+        <div class="sv-card" style="text-align:center;padding:36px 28px;">
+            <div style="font-size:44px;margin-bottom:14px;">📊</div>
+            <h3 style="color:{T['accent']};margin:0 0 8px;font-size:18px;">View Results</h3>
+            <p style="color:{T['text2']};font-size:13px;margin:0 0 20px;line-height:1.6;">
+                See detailed charts, grade breakdown, download PDF report, or share on WhatsApp.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("View Results →", use_container_width=True, key="d_res"):
+            st.session_state.page = "results"; st.rerun()
+
+    if history:
+        st.markdown(f"<br><span class='sv-label'>Recent Predictions</span>", unsafe_allow_html=True)
+        for h in reversed(history[-5:]):
+            g2, e2, lb2 = get_grade(h['score'])
+            sc = score_color(h['score'])
+            st.markdown(f"""
+            <div class="sv-card" style="display:flex;justify-content:space-between;
+                 align-items:center;padding:16px 22px;margin-bottom:10px;">
+                <div>
+                    <p style="margin:0 0 4px;font-size:12px;color:{T['text3']};">{h['time']}</p>
+                    <p style="margin:0;font-size:13px;color:{T['text2']};">
+                        Study: <b style="color:{T['text']}">{h['inputs'].get('hours',0)}h</b> &nbsp;|&nbsp;
+                        Attend: <b style="color:{T['text']}">{h['inputs'].get('attendance',0)}%</b> &nbsp;|&nbsp;
+                        Prev: <b style="color:{T['text']}">{h['inputs'].get('previous',0)}</b>
+                    </p>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-size:32px;font-weight:700;color:{sc};font-family:'Outfit',sans-serif;">{h['score']}</span>
+                    <p style="margin:0;font-size:12px;color:{T['text3']};">Grade {g2} · {lb2}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════
+#  PAGE: PREDICT
+# ══════════════════════════════════════════════════════
+def page_predict():
+    model, columns = load_model()
+
+    st.markdown(f"""
+    <div class="sv-hero">
+        <h1 style="margin:0 0 6px;font-size:28px;color:#fff;font-family:'Outfit',sans-serif;">🔮 Score Predictor</h1>
+        <p style="color:rgba(255,255,255,0.80);margin:0;font-size:14px;">
+            All numeric fields start at 0 · Study + Sleep cannot exceed 24 hours combined
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if model is None:
+        st.warning("⚠️ **Model files not found.** Make sure `student_model.pkl` and `model_columns.pkl` are in the same directory as this app.")
+        return
+
+    # ── Numeric section ────────────────────────────────
+    st.markdown(f"<span class='sv-label'>📐 Study & Health Metrics</span>", unsafe_allow_html=True)
+    n1, n2, n3, n4 = st.columns(4)
+    with n1: hours      = st.number_input("Hours Studied / day",  min_value=0, max_value=24, value=0, step=1)
+    with n2: sleep      = st.number_input("Sleep Hours / night",  min_value=0, max_value=24, value=0, step=1)
+    with n3: attendance = st.number_input("Attendance (%)",       min_value=0, max_value=100,value=0, step=1)
+    with n4: previous   = st.number_input("Previous Exam Score",  min_value=0, max_value=100,value=0, step=1)
+
+    if hours + sleep > 24:
+        st.error(f"⏰ **Time conflict!** Hours Studied ({hours}h) + Sleep ({sleep}h) = **{hours+sleep}h**, which exceeds 24 hours in a day. Please reduce one of them.")
+        return
+
+    remaining = 24 - hours - sleep
+    st.progress(min((hours + sleep) / 24, 1.0))
+    st.markdown(f"""
+    <p style="font-size:12px;color:{T['text3']};margin-top:4px;">
+        ⏱ Used: Study {hours}h + Sleep {sleep}h = {hours+sleep}h &nbsp;|&nbsp;
+        <span style="color:{T['success'] if remaining>=4 else T['danger']};">
+        Free time remaining: {remaining}h
+        </span>
+    </p>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Qualitative section ────────────────────────────
+    st.markdown(f"<span class='sv-label'>🧩 Learning Environment</span>", unsafe_allow_html=True)
+    q1, q2, q3 = st.columns(3)
+    with q1:
+        motivation  = st.selectbox("Motivation Level",      ["Low","Medium","High"],     key="q_mot")
+        teacher     = st.selectbox("Teacher Quality",        ["Poor","Average","Good"],   key="q_tea")
+        school_type = st.selectbox("School Type",            ["Public","Private"],         key="q_sch")
+        internet    = st.selectbox("Internet Access",        ["Yes","No"],                key="q_int")
+        resources   = st.selectbox("Learning Resources",     ["Low","Medium","High"],     key="q_res")
+    with q2:
+        income      = st.selectbox("Family Income",          ["Low","Medium","High"],     key="q_inc")
+        parent      = st.selectbox("Parental Involvement",   ["Low","Medium","High"],     key="q_par")
+        education   = st.selectbox("Parent Education Level", ["School","College"],         key="q_edu")
+        peer        = st.selectbox("Peer Influence",         ["Negative","Neutral","Positive"], key="q_pee")
+        activities  = st.selectbox("Extracurricular",        ["Yes","No"],                key="q_act")
+    with q3:
+        st.markdown(f"""
+        <div class="sv-card" style="padding:20px;">
+            <span class="sv-label">Input Summary</span>
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                <tr><td style="color:{T['text2']};padding:4px 0;">📚 Study</td>
+                    <td style="color:{T['text']};font-weight:600;text-align:right;">{hours}h/day</td></tr>
+                <tr><td style="color:{T['text2']};padding:4px 0;">😴 Sleep</td>
+                    <td style="color:{T['text']};font-weight:600;text-align:right;">{sleep}h/night</td></tr>
+                <tr><td style="color:{T['text2']};padding:4px 0;">📅 Attendance</td>
+                    <td style="color:{T['text']};font-weight:600;text-align:right;">{attendance}%</td></tr>
+                <tr><td style="color:{T['text2']};padding:4px 0;">📝 Prev Score</td>
+                    <td style="color:{T['text']};font-weight:600;text-align:right;">{previous}/100</td></tr>
+                <tr><td style="color:{T['text2']};padding:4px 0;">💡 Motivation</td>
+                    <td style="color:{T['text']};font-weight:600;text-align:right;">{motivation}</td></tr>
+                <tr><td style="color:{T['text2']};padding:4px 0;">🌐 Internet</td>
+                    <td style="color:{T['text']};font-weight:600;text-align:right;">{internet}</td></tr>
+                <tr><td style="color:{T['text2']};padding:4px 0;">🤝 Peers</td>
+                    <td style="color:{T['text']};font-weight:600;text-align:right;">{peer}</td></tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🚀  Predict My Exam Score", use_container_width=True, key="pred_btn"):
+        inp = dict(hours=hours, attendance=attendance, previous=previous, sleep=sleep,
+                   motivation=motivation, teacher=teacher, school_type=school_type,
+                   internet=internet, income=income, parent=parent, education=education,
+                   peer=peer, resources=resources, activities=activities)
+        with st.spinner("Analysing your profile..."):
+            s = predict_score(inp, model, columns)
+        st.session_state.prediction_result = s
+        st.session_state.prediction_inputs = inp
+        st.session_state.history.append({"score":s,"inputs":inp,
+                                          "time":datetime.now().strftime("%d %b %Y, %H:%M")})
+        st.session_state.page = "results"
+        st.rerun()
+
+
+# ══════════════════════════════════════════════════════
+#  PAGE: RESULTS
+# ══════════════════════════════════════════════════════
+def page_results():
+    score = st.session_state.prediction_result
+    inp   = st.session_state.prediction_inputs
+    user  = st.session_state.users.get(st.session_state.current_user, {})
+
+    if score is None or inp is None:
+        st.warning("No prediction yet. Please run the predictor first.")
+        if st.button("Go to Predictor"):
+            st.session_state.page = "predict"; st.rerun()
+        return
+
+    grade, emoji, label = get_grade(score)
+    sc = score_color(score)
+
+    st.markdown(f"""
+    <div class="sv-hero">
+        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+            <div style="font-size:68px;line-height:1;">{emoji}</div>
+            <div>
+                <div class="sv-pill" style="margin-bottom:8px;">{user.get('class_std','')} · {user.get('school_name','')}</div>
+                <h1 style="margin:0 0 4px;font-size:34px;color:#fff;font-family:'Outfit',sans-serif;font-weight:700;">
+                    {score}<span style="font-size:18px;opacity:0.75;">/100</span>
+                </h1>
+                <p style="margin:0;color:rgba(255,255,255,0.85);font-size:16px;">
+                    Grade <b>{grade}</b> — {label} · {user.get('name','')}
+                </p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Action buttons
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        pdf_bytes = make_pdf(user, score, inp)
+        st.download_button("📥  Download PDF Report", data=pdf_bytes,
+                           file_name=f"ScoreVision_{user.get('name','').replace(' ','_')}.pdf",
+                           mime="application/pdf", use_container_width=True)
+    with b2:
+        msg = (f"🎯 ScoreVision Report%0A"
+               f"Name: {user.get('name','')}%0A"
+               f"Score: {score}/100 | Grade: {grade} {emoji}%0A"
+               f"Class: {user.get('class_std','')}%0A"
+               f"School: {user.get('school_name','')}%0A"
+               f"Check your performance with ScoreVision!")
+        st.markdown(f"""
+        <a href="https://wa.me/?text={msg}" target="_blank" style="text-decoration:none;">
+            <div style="background:#25D366;color:#fff;border-radius:10px;padding:10px 16px;
+                 text-align:center;font-weight:600;font-size:14px;cursor:pointer;
+                 box-shadow:0 4px 16px rgba(37,211,102,0.30);font-family:'Outfit',sans-serif;">
+                📲 Share on WhatsApp
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
+    with b3:
+        if st.button("🔄  New Prediction", use_container_width=True, key="new_pred"):
+            st.session_state.page = "predict"; st.rerun()
+
+    # Charts
+    st.markdown(f"<br><span class='sv-label'>📊 Performance Analytics</span>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="sv-card" style="padding:4px 8px;">
+    """, unsafe_allow_html=True)
+    fig = make_charts(score, inp, user)
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Score breakdown
+    st.markdown("<br>", unsafe_allow_html=True)
+    r1, r2 = st.columns([1, 2])
+    with r1:
+        st.markdown(f"""
+        <div class="sv-card" style="text-align:center;padding:32px;">
+            <span class="sv-label">Score Breakdown</span>
+            <div style="font-size:64px;font-weight:700;color:{sc};font-family:'Outfit',sans-serif;line-height:1.1;">{score}</div>
+            <div style="font-size:18px;color:{T['text2']};margin-top:4px;">Grade {grade} {emoji}</div>
+            <div style="margin-top:12px;padding:10px 16px;background:{T['surface2']};border-radius:10px;">
+                <p style="margin:0;font-size:13px;color:{T['text2']};">{label}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    with r2:
+        st.markdown(f"<span class='sv-label'>Input Summary</span>", unsafe_allow_html=True)
+        df_summary = pd.DataFrame({
+            "Parameter": ["Hours Studied","Attendance %","Previous Score","Sleep Hours",
+                          "Motivation","Teacher Quality","School Type","Internet Access",
+                          "Family Income","Parental Involvement","Parent Education",
+                          "Peer Influence","Learning Resources","Extracurricular"],
+            "Your Value": [inp.get('hours'), inp.get('attendance'), inp.get('previous'),
+                           inp.get('sleep'), inp.get('motivation'), inp.get('teacher'),
+                           inp.get('school_type'), inp.get('internet'), inp.get('income'),
+                           inp.get('parent'), inp.get('education'), inp.get('peer'),
+                           inp.get('resources'), inp.get('activities')]
+        })
+        st.dataframe(df_summary, use_container_width=True, hide_index=True, height=350)
+
+
+# ══════════════════════════════════════════════════════
+#  PAGE: PROFILE
+# ══════════════════════════════════════════════════════
+def page_profile():
+    user = st.session_state.users.get(st.session_state.current_user, {})
+    st.markdown(f"""
+    <div class="sv-hero">
+        <h1 style="margin:0 0 6px;font-size:28px;color:#fff;font-family:'Outfit',sans-serif;">👤 Edit Profile</h1>
+        <p style="color:rgba(255,255,255,0.80);margin:0;font-size:14px;">Update your personal information and profile photo</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    pc1, pc2 = st.columns([1, 2.2], gap="large")
+    with pc1:
+        st.markdown(f"<span class='sv-label'>Profile Photo</span>", unsafe_allow_html=True)
+        photo_file = st.file_uploader("Upload Photo", type=["png","jpg","jpeg"],
+                                      key="prof_photo", label_visibility="collapsed")
+        if photo_file:
+            b64 = base64.b64encode(photo_file.read()).decode()
+            ext = photo_file.name.split('.')[-1]
+            st.session_state.users[st.session_state.current_user]['photo'] = \
+                f"data:image/{ext};base64,{b64}"
+            user = st.session_state.users[st.session_state.current_user]
+
+        initials = ''.join([w[0].upper() for w in user.get('name','U').split()[:2]])
+        if user.get('photo'):
+            st.markdown(f"""
+            <div style="text-align:center;margin-top:12px;">
+                <img src="{user['photo']}" style="width:110px;height:110px;border-radius:50%;
+                     object-fit:cover;border:3px solid {T['accent']};" />
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="text-align:center;margin-top:12px;">
+                <div style="width:110px;height:110px;border-radius:50%;
+                     background:linear-gradient(135deg,{T['grad_a']},{T['grad_b']});
+                     display:flex;align-items:center;justify-content:center;
+                     font-size:32px;font-weight:700;color:#fff;margin:0 auto;">
+                    {initials}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style="text-align:center;margin-top:12px;">
+            <p style="font-weight:600;font-size:15px;color:{T['text']};margin:0;">{user.get('name','')}</p>
+            <p style="font-size:12px;color:{T['text3']};margin:4px 0 0;">{user.get('role','').capitalize()}</p>
+            <p style="font-size:12px;color:{T['text3']};margin:2px 0 0;">{user.get('email','')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with pc2:
+        st.markdown(f"<span class='sv-label'>Personal Information</span>", unsafe_allow_html=True)
+        with st.form("prof_form"):
+            pf1, pf2 = st.columns(2)
+            with pf1:
+                new_name     = st.text_input("Full Name",        value=user.get('name',''))
+                new_class    = st.selectbox("Class / Standard",  CLASS_OPTIONS,
+                                            index=CLASS_OPTIONS.index(user.get('class_std', CLASS_OPTIONS[0]))
+                                            if user.get('class_std') in CLASS_OPTIONS else 0)
+                new_city     = st.text_input("City",             value=user.get('city',''))
+            with pf2:
+                new_school   = st.text_input("School / College", value=user.get('school_name',''))
+                new_dob      = st.text_input("Date of Birth",    value=user.get('dob',''))
+                new_phone    = st.text_input("Phone Number",     value=user.get('phone',''))
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            saved = st.form_submit_button("💾  Save Changes", use_container_width=True)
+            if saved:
+                st.session_state.users[st.session_state.current_user].update({
+                    "name": new_name.strip(), "class_std": new_class,
+                    "school_name": new_school.strip(), "city": new_city.strip(),
+                    "dob": new_dob.strip(), "phone": new_phone.strip(),
+                })
+                st.success("✅ Profile updated successfully!")
                 st.rerun()
-        inject_css(T)
-        if st.session_state.page == "landing":
-            page_landing()
-        elif st.session_state.page == "auth":
-            page_auth()
-    else:
-        if not st.session_state.logged_in:
-            st.session_state.page = "auth"
-            st.rerun()
-        sidebar_nav()
-        if st.session_state.page == "dashboard":
-            page_dashboard()
-        elif st.session_state.page == "predict":
-            page_predict()
-        elif st.session_state.page == "results":
-            page_results()
-        elif st.session_state.page == "profile":
-            page_profile()
+
+
+# ══════════════════════════════════════════════════════
+#  ROUTER
+# ══════════════════════════════════════════════════════
+def main():
+    inject_css()
+
+    if st.session_state.page in ("landing","auth"):
+        with st.sidebar:
+            tog = "☀️  Light Mode" if st.session_state.theme=="dark" else "🌙  Dark Mode"
+            if st.button(tog, key="pub_theme"):
+                st.session_state.theme = "dark" if st.session_state.theme=="light" else "light"
+                st.rerun()
+        if   st.session_state.page == "landing": page_landing()
+        elif st.session_state.page == "auth":    page_auth()
+        return
+
+    if not st.session_state.logged_in:
+        st.session_state.page = "auth"; st.rerun()
+
+    sidebar()
+
+    page_map = {
+        "dashboard": page_dashboard,
+        "predict":   page_predict,
+        "results":   page_results,
+        "profile":   page_profile,
+    }
+    page_map.get(st.session_state.page, page_dashboard)()
 
 
 if __name__ == "__main__":
