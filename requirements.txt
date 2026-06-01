@@ -3,7 +3,5 @@ pandas
 numpy
 scikit-learn
 joblib
-plotly
-matplotlib
 reportlab
-fpdf2
+plotly
